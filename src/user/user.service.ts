@@ -1,17 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { PrismaService } from '@prisma/prisma.service';
+import { genSalt, genSaltSync, hashSync } from 'bcrypt';
 
 @Injectable()
 export class UserService {
     constructor(private readonly prismaService: PrismaService) { }
 
-    // TODO dont forget to hash pasword 
+
     save(user: Partial<User>) {
+        const hashedPassword = this.hashPassword(user.password);
         return this.prismaService.user.create({
             data: {
                 email: user.email,
-                password: user.password,
+                password: hashedPassword,
                 roles: ["USER"]
             }
         })
@@ -34,5 +36,9 @@ export class UserService {
 
     delete(id: string) { 
         return this.prismaService.user.delete({ where:{ id }});
+    }
+
+    private hashPassword(password : string) {
+        return hashSync(password, genSaltSync(10));
     }
 }
