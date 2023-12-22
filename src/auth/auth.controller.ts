@@ -4,10 +4,11 @@ import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { Tokens } from './interfaces';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { Cookie, Public, UserAgent } from '@common/src/decorators';
 import { Token } from '@prisma/client';
 import { UserResponse } from '@user/responses';
+import { GoogleGuard } from './guards/google.guard';
 
 const REFRESH_TOKEN = 'refreshtoken';
 
@@ -73,6 +74,18 @@ export class AuthController {
             path: '/',
         });
         res.status(HttpStatus.CREATED).json({ accessToken: tokens.accessToken });
+    }
+
+    @UseGuards(GoogleGuard)
+    @Get('google')
+    googleAuth() {
+        
+    }
+
+    @UseGuards(GoogleGuard)
+    @Get('google/callback')
+    googleAuthCallback(@Req() req: Request) {
+        return req.user;
     }
 
 }
