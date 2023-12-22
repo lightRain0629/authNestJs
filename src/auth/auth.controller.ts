@@ -1,4 +1,4 @@
-import { BadRequestException, Body, ClassSerializerInterceptor, Controller, Get, HttpStatus, Post, Req, Res, UnauthorizedException, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, ClassSerializerInterceptor, Controller, Get, HttpStatus, Post, Req, Res, UnauthorizedException, UseGuards, UseInterceptors } from '@nestjs/common';
 import { RegisterDto } from './dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
@@ -28,7 +28,7 @@ export class AuthController {
 
     @Post('login')
     async login(@Body() dto: LoginDto, @Res() res: Response, @UserAgent() agent: string) {
- 
+
         const tokens = await this.authService.login(dto, agent);
         if (!tokens) {
             throw new BadRequestException(`Cannot to login as user with data ${JSON.stringify(dto)}`);
@@ -72,8 +72,7 @@ export class AuthController {
             secure: this.configService.get('NODE_ENV', 'development') === 'production',
             path: '/',
         });
-        res.status(HttpStatus.CREATED).json({accessToken: tokens.accessToken});
+        res.status(HttpStatus.CREATED).json({ accessToken: tokens.accessToken });
     }
-
 
 }
