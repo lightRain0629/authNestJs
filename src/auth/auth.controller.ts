@@ -5,11 +5,12 @@ import { AuthService } from './auth.service';
 import { Tokens } from './interfaces';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
-import { Cookie, UserAgent } from '@common/src/decorators';
+import { Cookie, Public, UserAgent } from '@common/src/decorators';
 import { Token } from '@prisma/client';
 
 const REFRESH_TOKEN = 'refreshtoken';
 
+@Public()
 @Controller('auth')
 export class AuthController {
     constructor(private readonly authService: AuthService, private readonly configService: ConfigService) { }
