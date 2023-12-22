@@ -50,6 +50,17 @@ export class AuthController {
         this.setRefreshTokenToCookies(tokens, res);
     }
 
+    @Get('logout')
+    async logout(@Cookie(REFRESH_TOKEN) refreshToken: Token, @Res() res: Response,) {
+        if (!refreshToken) {
+            res.sendStatus(HttpStatus.OK);
+            return;
+        }
+        await this.authService.deleteRefreshToken(refreshToken.token); // ? if this part catchs error change type of refreshToken to string 
+        res.cookie(REFRESH_TOKEN, '', { httpOnly: true, secure: true, expires: new Date() })
+        res.sendStatus(HttpStatus.OK);
+    }
+
     private setRefreshTokenToCookies(tokens: Tokens, res: Response) {
         if (!tokens) {
             throw new UnauthorizedException()
