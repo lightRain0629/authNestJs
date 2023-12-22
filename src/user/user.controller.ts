@@ -28,8 +28,7 @@ export class UserController {
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     @Get()
-    async me(@Param('idOrEmail') idOrEmail: string) {
-        const user = await this.userService.findOne(idOrEmail);
-        return new UserResponse(user);
+    async me( @CurrentUser() user: JwtPayload) {
+        return user;
     }
 }
