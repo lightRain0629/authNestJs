@@ -1,10 +1,10 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { RegisterDto } from './dto';
 import { UserService } from '@user/user.service';
 import { LoginDto } from './dto/login.dto';
 import { Tokens } from './interfaces';
 import { compareSync } from 'bcrypt';
-import { Token, User } from '@prisma/client';
+import { Provider, Token, User } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@prisma/prisma.service';
 import { v4 } from 'uuid';
@@ -15,8 +15,8 @@ export class AuthService {
 
     private readonly logger: Logger = new Logger(AuthService.name);
     constructor(private readonly userService: UserService, private readonly jwtService: JwtService, private readonly prismaService: PrismaService) { }
-    
-    async refreshTokens(refreshToken: Token, agent: string) : Promise<Tokens> {
+
+    async refreshTokens(refreshToken: Token, agent: string): Promise<Tokens> {
         const token = await this.prismaService.token.findUnique({ where: { token: refreshToken.token } });
         if (!token) {
             throw new UnauthorizedException();
@@ -27,9 +27,9 @@ export class AuthService {
         }
         const user = await this.userService.findOne(token.userId)
         return this.generateTokens(user, agent);
-     }
-     
-    
+    }
+
+
     async register(dto: RegisterDto) {
         const user: User = await this.userService.findOne(dto.email).catch((err) => {
             this.logger.error(err);
@@ -52,10 +52,10 @@ export class AuthService {
         if (!user || !compareSync(dto.password, user.password)) {
             throw new UnauthorizedException('Wrong password or username');
         }
-       return this.generateTokens(user, agent);
+        return this.generateTokens(user, agent);
     }
 
-    private async generateTokens(user: User, agent: string) : Promise<Tokens> {
+    private async generateTokens(user: User, agent: string): Promise<Tokens> {
         const accessToken = 'Bearer ' + this.jwtService.sign({
             id: user.id,
             email: user.email,
@@ -69,9 +69,9 @@ export class AuthService {
         const _token = await this.prismaService.token.findFirst({ where: { userId, userAgent: agent } })
 
         const token = _token?.token ?? '';
-        
+
         return this.prismaService.token.upsert({
-            where: {token: token},
+            where: { token: token },
             update: {
                 token: v4(),
                 exp: add(new Date(), { months: 1 }),
@@ -87,5 +87,20 @@ export class AuthService {
 
     deleteRefreshToken(token: string) {
         return this.prismaService.token.delete({ where: { token } });
+    }
+
+    async googleAuth(email: string, agent: string) {
+        const userExist = await this.userService.findOne(email);
+        if (userExist) {
+            this.generateTokens(userExist, agent)
+        }
+        const user = await this.userService.save({ email, provider: Provider.GOOGLE }).catch(err => {
+            this.logger.error(err);
+            return null;
+        })
+        if (!user) {
+            throw new BadRequestException(`Cannot generate user with ${email} by Google Auth`)
+        }
+        return this.generateTokens(user, agent);
     }
 }
