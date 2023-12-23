@@ -89,12 +89,16 @@ export class AuthService {
         return this.prismaService.token.delete({ where: { token } });
     }
 
-    async googleAuth(email: string, agent: string) {
+    async providerAuth(email: string, agent: string, provider: Provider) {
         const userExist = await this.userService.findOne(email);
         if (userExist) {
-            this.generateTokens(userExist, agent)
+            const user = await this.userService.save({ email, provider: provider }).catch(err => {
+                this.logger.error(err);
+                return null;
+            })
+            this.generateTokens(user, agent)
         }
-        const user = await this.userService.save({ email, provider: Provider.GOOGLE }).catch(err => {
+        const user = await this.userService.save({ email, provider: provider }).catch(err => {
             this.logger.error(err);
             return null;
         })
@@ -103,4 +107,6 @@ export class AuthService {
         }
         return this.generateTokens(user, agent);
     }
+
+
 }

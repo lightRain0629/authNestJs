@@ -17,16 +17,28 @@ export class UserService {
     ) { }
 
 
-    save(user: Partial<User>) {
+    async save(user: Partial<User>) {
+
         const hashedPassword = user?.password ? this.hashPassword(user.password) : null;
-        return this.prismaService.user.create({
-            data: {
+        const savedUSer = await this.prismaService.user.upsert({
+            where: {
+                email: user.email,
+            },
+            update: {
+                password: hashedPassword,
+                roles: user?.roles,
+                provider: user?.provider
+            },
+            create: {
                 email: user.email,
                 password: hashedPassword,
                 roles: ["USER"],
-                provider: user.provider
+                provider: user?.provider
             }
-        })
+        });
+        await this.cacheManager.set(savedUSer.id, savedUSer);
+        await this.cacheManager.set(savedUSer.email, savedUSer);
+        return savedUSer;
     }
 
     async findOne(idOrEmail: string, isReset = false) {
@@ -50,7 +62,7 @@ export class UserService {
             if (!user) {
                 return null;
             }
-            await this.cacheManager.set(idOrEmail, user, convertToSecondsUtil(this.configService.get('JWT_EXP')) );
+            await this.cacheManager.set(idOrEmail, user, convertToSecondsUtil(this.configService.get('JWT_EXP')));
             return user;
         }
         return user;
@@ -60,7 +72,7 @@ export class UserService {
         if (user.id !== id && !user.roles.includes(Role.ADMIN)) {
             throw new ForbiddenException();
         }
-  
+
         await Promise.all([
             this.cacheManager.del(id),
             this.cacheManager.del(user.email)
@@ -70,7 +82,7 @@ export class UserService {
                 id: true
             }
         });
-        
+
     }
 
     private hashPassword(password: string) {
