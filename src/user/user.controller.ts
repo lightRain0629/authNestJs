@@ -1,9 +1,9 @@
-import { Body, ClassSerializerInterceptor, Controller, Delete, Get, Param, ParseUUIDPipe, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, ClassSerializerInterceptor, Controller, Delete, Get, Param, ParseUUIDPipe,   Put, UseGuards, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserResponse } from './responses';
 import { CurrentUser, Roles } from '@common/src/decorators';
 import { JwtPayload } from 'src/auth/interfaces';
-import { Role } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import { RolesGuard } from 'src/auth/guards/role.guard';
 
 @Controller('user')
@@ -30,5 +30,12 @@ export class UserController {
     @Get()
     async me( @CurrentUser() user: JwtPayload) {
         return user;
+    }
+
+    @UseInterceptors(ClassSerializerInterceptor)
+    @Put()
+    async updateuser(@Body() body: Partial<User>) {
+        const user = await this.userService.save(body);
+        return new UserResponse(user);
     }
 }

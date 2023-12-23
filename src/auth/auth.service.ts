@@ -17,14 +17,10 @@ export class AuthService {
     constructor(private readonly userService: UserService, private readonly jwtService: JwtService, private readonly prismaService: PrismaService) { }
 
     async refreshTokens(refreshToken: Token, agent: string): Promise<Tokens> {
-        const token = await this.prismaService.token.findUnique({ where: { token: refreshToken.token } });
-        if (!token) {
+        const token = await this.prismaService.token.delete({ where: { token: refreshToken.token } });
+        if (!token || new Date(token.exp) < new Date()  ) {
             throw new UnauthorizedException();
         };
-        await this.prismaService.token.delete({ where: { token: refreshToken.token } });
-        if (new Date(token.exp) < new Date()) {
-            throw new UnauthorizedException()
-        }
         const user = await this.userService.findOne(token.userId)
         return this.generateTokens(user, agent);
     }

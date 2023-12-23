@@ -25,9 +25,10 @@ export class UserService {
                 email: user.email,
             },
             update: {
-                password: hashedPassword,
-                roles: user?.roles,
-                provider: user?.provider
+                password: hashedPassword ?? undefined,
+                roles: user?.roles ?? undefined,
+                provider: user?.provider ?? undefined,
+                isBlocked: user?.isBlocked ?? undefined
             },
             create: {
                 email: user.email,
