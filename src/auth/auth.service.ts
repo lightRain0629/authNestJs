@@ -18,7 +18,7 @@ export class AuthService {
 
     async refreshTokens(refreshToken: Token, agent: string): Promise<Tokens> {
         const token = await this.prismaService.token.delete({ where: { token: refreshToken.token } });
-        if (!token || new Date(token.exp) < new Date()  ) {
+        if (!token || new Date(token.exp) < new Date()) {
             throw new UnauthorizedException();
         };
         const user = await this.userService.findOne(token.userId)
@@ -55,7 +55,9 @@ export class AuthService {
         const accessToken = 'Bearer ' + this.jwtService.sign({
             id: user.id,
             email: user.email,
-            roles: user.roles
+            roles: user.roles,
+            agent: '2ec7d6bebb8aafa2_a24_SM-A245F'
+            // agent: agent 
         })
         const refreshToken = await this.getRefreshToken(user.id, agent);
         return { accessToken, refreshToken };
@@ -77,7 +79,7 @@ export class AuthService {
                 exp: add(new Date(), { months: 1 }),
                 userId,
                 userAgent: agent
-            }
+            },
         })
     }
 
