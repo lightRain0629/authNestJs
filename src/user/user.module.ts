@@ -6,8 +6,8 @@ import { CacheModule } from '@nestjs/cache-manager';
 @Module({
   providers: [UserService],
   imports: [CacheModule.register()],
- 
+
   exports: [UserService],
-  controllers: [UserController]
+  controllers: [UserController],
 })
 export class UserModule {}

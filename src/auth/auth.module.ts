@@ -8,10 +8,32 @@ import { options } from './config';
 import { STRATEGIES } from './strategies';
 import { GUARDS } from './guards';
 import { HttpModule } from '@nestjs/axios';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, ...STRATEGIES, ...GUARDS],
-  imports: [PassportModule, JwtModule.registerAsync(options()), UserModule, HttpModule]
+  providers: [
+    AuthService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    ...STRATEGIES,
+    ...GUARDS,
+  ],
+  imports: [
+    PassportModule,
+    JwtModule.registerAsync(options()),
+    UserModule,
+    HttpModule,
+    ThrottlerModule.forRoot([
+      {
+        name: 'auth',
+        ttl: 60000, // 1 минута
+        limit: 10, // 10 запросов в минуту для auth эндпоинтов
+      },
+    ]),
+  ],
 })
-export class AuthModule { }
+export class AuthModule {}

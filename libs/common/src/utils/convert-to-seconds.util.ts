@@ -1,5 +1,5 @@
 export function convertToSecondsUtil(timeStr: string) {
-    if (!isNaN(+timeStr)) {
+    if (!isNaN(timeStr as any)) {
         return parseInt(timeStr);
     }
 

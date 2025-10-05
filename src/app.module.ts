@@ -8,13 +8,23 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
-  imports: [UserModule, PrismaModule, AuthModule, ConfigModule.forRoot({ isGlobal: true }), CacheModule.register()],
-  controllers: [],
+  imports: [
+    UserModule,
+    PrismaModule,
+    AuthModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    CacheModule.register(),
+  ],
+
   providers: [
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard
-    }
+      useClass: JwtAuthGuard,
+    },
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: ThrottlerGuard,
+    // },
   ],
 })
-export class AppModule { }
+export class AppModule {}

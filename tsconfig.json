@@ -18,24 +18,14 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@prisma": [
-        "src/prisma"
-      ],
-      "@prisma/*": [
-        "src/prisma/*"
-      ],
-      "@user": [
-        "src/user"
-      ],
-      "@user/*": [
-        "src/user/*"
-      ],
-      "@common": [
-        "libs/common"
-      ],
-      "@common/*": [
-        "libs/common/*"
-      ]
+      "@prisma": ["src/prisma"],
+      "@prisma/*": ["src/prisma/*"],
+      "@user": ["src/user"],
+      "@user/*": ["src/user/*"],
+      "@common": ["libs/common"],
+      "@common/*": ["libs/common/*"],
+      "@auth": ["libs/auth"],
+      "@auth/*": ["libs/auth/*"]
     }
   }
 }
