@@ -47,6 +47,7 @@ export class AuthService {
       throw new ConflictException('User with this mail already registered');
     }
     return this.userService.save(dto).catch((err) => {
+      // todo if you want you can implement generate tokens after register
       this.logger.error(err);
       return null;
     });
@@ -81,13 +82,15 @@ export class AuthService {
 
   private async getRefreshToken(userId: string, agent: string): Promise<Token> {
     const _token = await this.prismaService.token.findFirst({
-      where: { userId, userAgent: agent },
+      where: {
+        userId,
+        userAgent: agent,
+      },
     });
-
-    const token = _token?.token ?? '';
-
+    const token = _token?.token ?? null;
+    
     return this.prismaService.token.upsert({
-      where: { token: token },
+      where: { token },
       update: {
         token: v4(),
         exp: add(new Date(), { months: 1 }),
