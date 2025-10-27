@@ -1,11 +1,13 @@
-import { ExecutionContext, SetMetadata } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
-
+import { ExecutionContext, SetMetadata } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
 export const PUBLIC_KEY = 'public';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
 
 export const isPublic = (ctx: ExecutionContext, reflector: Reflector) => {
-    const isPublic = reflector.getAllAndOverride(PUBLIC_KEY, [ctx.getHandler(), ctx.getClass()])
-    return isPublic;
-}
+  const isPublic = reflector.getAllAndOverride(PUBLIC_KEY, [
+    ctx.getHandler(),
+    ctx.getClass(),
+  ]);
+  return isPublic;
+};

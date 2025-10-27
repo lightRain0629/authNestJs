@@ -60,6 +60,13 @@ export class AuthService {
         this.logger.error(err);
         return null;
       });
+
+    if (!!user.provider && !user.password) {
+      throw new BadRequestException(
+        `User registered via ${user.provider}. Please use ${user.provider} login.`,
+      );
+    }
+
     if (!user || !compareSync(dto.password, user.password)) {
       throw new UnauthorizedException('Wrong password or username');
     }
@@ -87,8 +94,8 @@ export class AuthService {
         userAgent: agent,
       },
     });
-    const token = _token?.token ?? null;
-    
+
+    const token = _token?.token ?? '';
     return this.prismaService.token.upsert({
       where: { token },
       update: {

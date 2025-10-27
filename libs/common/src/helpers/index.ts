@@ -1,1 +1,1 @@
-export * from './timeout-error.helper'
+export * from './timeout-error.helper';

@@ -28,9 +28,20 @@ import { map, mergeMap } from 'rxjs';
 import { handleTimeoutAndErrors } from '@common/src/helpers';
 import { YandexGuard } from './guards/yandex.guard';
 import { Throttle } from '@nestjs/throttler';
+import {
+  ApiBadRequestResponse,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 
 const REFRESH_TOKEN = 'refreshtoken';
 
+@ApiTags('auth')
 @Public()
 @Controller('auth')
 export class AuthController {
@@ -43,6 +54,12 @@ export class AuthController {
   @UseInterceptors(ClassSerializerInterceptor)
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiCreatedResponse({
+    description: 'User successfully registered',
+    type: UserResponse,
+  })
+  @ApiBadRequestResponse({ description: 'Registration data is invalid' })
   async register(@Body() dto: RegisterDto) {
     const user = await this.authService.register(dto);
     if (!user) {
@@ -55,6 +72,18 @@ export class AuthController {
 
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Authenticate user credentials' })
+  @ApiCreatedResponse({
+    description: 'Tokens issued and refresh token stored in cookie',
+    schema: {
+      type: 'object',
+      properties: {
+        accessToken: { type: 'string' },
+        refreshToken: { type: 'string' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid credentials supplied' })
   async login(
     @Body() dto: LoginDto,
     @Res() res: Response,
@@ -72,6 +101,19 @@ export class AuthController {
 
   @Get('refresh-tokens')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+  @ApiCookieAuth('refreshtoken')
+  @ApiCreatedResponse({
+    description: 'Tokens refreshed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        accessToken: { type: 'string' },
+        refreshToken: { type: 'string' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Refresh token missing or invalid' })
   async refreshTokens(
     @Cookie(REFRESH_TOKEN) refreshToken: string,
     @Res() res: Response,
@@ -88,6 +130,9 @@ export class AuthController {
   }
 
   @Get('logout')
+  @ApiOperation({ summary: 'Invalidate refresh token cookie' })
+  @ApiCookieAuth('refreshtoken')
+  @ApiOkResponse({ description: 'Refresh token removed' })
   async logout(
     @Cookie(REFRESH_TOKEN) refreshToken: string,
     @Res() res: Response,
@@ -125,10 +170,12 @@ export class AuthController {
 
   @UseGuards(GoogleGuard)
   @Get('google')
+  @ApiOperation({ summary: 'Initiate Google OAuth flow' })
   googleAuth() {}
 
   @UseGuards(GoogleGuard)
   @Get('google/callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback' })
   googleAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
     return res.redirect(
@@ -137,6 +184,12 @@ export class AuthController {
   }
 
   @Get('success-google')
+  @ApiOperation({ summary: 'Finalize Google OAuth login using token' })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    description: 'OAuth access token from Google',
+  })
   successGoogle(
     @Query('token') token: string,
     @UserAgent() agent: string,
@@ -157,10 +210,12 @@ export class AuthController {
 
   @UseGuards(YandexGuard)
   @Get('yandex')
+  @ApiOperation({ summary: 'Initiate Yandex OAuth flow' })
   yandexAuth() {}
 
   @UseGuards(YandexGuard)
   @Get('yandex/callback')
+  @ApiOperation({ summary: 'Handle Yandex OAuth callback' })
   yandexAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
     return res.redirect(
@@ -169,6 +224,12 @@ export class AuthController {
   }
 
   @Get('success-yandex')
+  @ApiOperation({ summary: 'Finalize Yandex OAuth login using token' })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    description: 'OAuth access token from Yandex',
+  })
   successYandex(
     @Query('token') token: string,
     @UserAgent() agent: string,
