@@ -6,10 +6,12 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CacheModule } from '@nestjs/cache-manager';
+import { TodoModule } from './todo/todo.module';
 
 @Module({
   imports: [
     UserModule,
+    TodoModule,
     PrismaModule,
     AuthModule,
     ConfigModule.forRoot({ isGlobal: true }),

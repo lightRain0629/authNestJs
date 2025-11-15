@@ -41,8 +41,8 @@ export class UserController {
     return new UserResponse(user);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  // @UseGuards(RolesGuard)
+  // @Roles(Role.ADMIN)
   @Get()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get authenticated user payload' })

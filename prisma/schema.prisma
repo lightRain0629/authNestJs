@@ -19,6 +19,7 @@ model User {
   Token     Token[]
 
   @@map("users")
+  todos Todo[]
 }
 
 model Token {
@@ -39,4 +40,17 @@ enum Role {
 enum Provider {
   GOOGLE
   YANDEX
+}
+
+model Todo {
+  id        String   @id @default(uuid())
+  title     String
+  isCompleted Boolean  @default(false) @map("is_completed")
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("todos")
 }
