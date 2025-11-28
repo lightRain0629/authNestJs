@@ -9,4 +9,6 @@ export interface JwtPayload {
   id: string;
   email: string;
   roles: string[];
+  agent: string;
+  deviceId?: string;
 }

@@ -16,7 +16,10 @@ model User {
   roles     Role[]
   provider  Provider?
   isBlocked Boolean   @default(false) @map("is_blocked")
+  isVerified Boolean  @default(false) @map("is_verified")
   Token     Token[]
+  PasswordReset PasswordReset[]
+  EmailOtp  EmailOtp[]
 
   @@map("users")
   todos Todo[]
@@ -25,11 +28,42 @@ model User {
 model Token {
   token     String   @unique
   exp       DateTime
+  createdAt DateTime @default(now()) @map("created_at")
   userId    String
   userAgent String   @map("user_agent")
+  ip        String?
+  deviceId  String?  @map("device_id")
+  device    String?
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("tokens")
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  exp       DateTime
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  userId    String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
+
+model EmailOtp {
+  id        String   @id @default(uuid())
+  code      String
+  exp       DateTime
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  userId    String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, used, exp])
+  @@map("email_otps")
 }
 
 enum Role {

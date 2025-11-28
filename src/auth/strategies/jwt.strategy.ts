@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtPayload } from '../interfaces';
 import { UserService } from '@user/user.service';
 import { User } from '@prisma/client';
+import { PrismaService } from '@prisma/prisma.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -12,6 +13,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly configService: ConfigService,
     private readonly userService: UserService,
+    private readonly prismaService: PrismaService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -27,7 +29,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         this.logger.error(err);
         return null;
       });
-    if (!user || user.isBlocked) {
+    if (!user || user.isBlocked || !payload.agent || !user.isVerified) {
+      throw new UnauthorizedException();
+    }
+
+    const activeSession = await this.prismaService.token.findFirst({
+      where: {
+        userId: payload.id,
+        userAgent: payload.agent,
+        ...(payload.deviceId ? { deviceId: payload.deviceId } : {}),
+        exp: { gt: new Date() },
+      },
+    });
+
+    if (!activeSession) {
       throw new UnauthorizedException();
     }
     return payload;
