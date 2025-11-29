@@ -30,15 +30,15 @@ export class MailerService {
       return;
     }
 
-    const host = this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com');
-    const port = Number(this.configService.get<string>('SMTP_PORT', '465'));
-    const secure =
-      this.configService.get<string>('SMTP_SECURE', 'true') === 'true';
+    // const host = this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com');
+    // const port = Number(this.configService.get<string>('SMTP_PORT', '465'));
+    // const secure =
+    //   this.configService.get<string>('SMTP_SECURE', 'true') === 'true';
 
     this.transporter = createTransport({
-      host,
-      port,
-      secure,
+      // host,
+      // port,
+      // secure,
       service: 'gmail',
       auth: { user, pass },
     });
@@ -52,25 +52,16 @@ export class MailerService {
       );
       return;
     }
-    this.logger.log(
-      `Sending mail to ${options.to} with subject "${
-        options.subject
-      }": Credentials used ${
-        this.fromAddress
-      } User: ${this.configService.get<string>(
-        'EMAIL',
-      )} Pass: ${this.configService.get<string>('EMAIL_PASSWORD')}`,
-    );
-    
+
     const { to, subject, text, html, fromName } = options;
 
     this.logger.log({
-        from: fromName ? `${fromName} <${this.fromAddress}>` : this.fromAddress,
-        to,
-        subject,
-        text: text ?? html?.replace(/<[^>]*>/g, ' '),
-        // html,-
-      });
+      from: fromName ? `${fromName} <${this.fromAddress}>` : this.fromAddress,
+      to,
+      subject,
+      text: text ?? html?.replace(/<[^>]*>/g, ' '),
+      html,
+    });
     try {
       await this.transporter.sendMail({
         from: fromName ? `${fromName} <${this.fromAddress}>` : this.fromAddress,
