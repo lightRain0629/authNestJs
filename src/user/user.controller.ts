@@ -124,7 +124,6 @@ export class UserController {
       limit,
       queryString,
       path,
-      extraParams: { query: search },
     });
   }
 

@@ -100,7 +100,6 @@ export class TodoController {
       page,
       limit,
       queryString,
-      extraParams: { query: search },
       path,
     });
   }
