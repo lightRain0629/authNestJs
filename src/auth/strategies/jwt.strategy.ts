@@ -29,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         this.logger.error(err);
         return null;
       });
-    if (!user || user.isBlocked || !payload.agent || !user.isVerified) {
+    if (!user || user.isBlocked) {
       throw new UnauthorizedException();
     }
 

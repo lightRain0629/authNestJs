@@ -45,11 +45,7 @@ export class AuthService {
     const isDeviceMismatch = token?.deviceId
       ? token.deviceId !== deviceId
       : token?.userAgent !== agent;
-    if (
-      !token ||
-      new Date(token.exp) < new Date() ||
-      isDeviceMismatch
-    ) {
+    if (!token || new Date(token.exp) < new Date() || isDeviceMismatch) {
       throw new UnauthorizedException();
     }
     await this.prismaService.token.delete({ where: { token: refreshToken } });
@@ -132,37 +128,24 @@ export class AuthService {
     ip?: string,
     deviceId?: string,
   ): Promise<Token> {
-    const _token = await this.prismaService.token.findFirst({
-      where: {
-        userId,
-        ...(deviceId
-          ? {
-              deviceId,
-            }
-          : { userAgent: agent }),
-      },
-    });
+    const deviceWhere = deviceId
+      ? { userId, deviceId }
+      : { userId, userAgent: agent };
 
-    const token = _token?.token ?? '';
-    return this.prismaService.token.upsert({
-      where: { token },
-      update: {
-        token: v4(),
-        exp: add(new Date(), { months: 1 }),
-        ip,
-        deviceId,
-        userAgent: agent,
-        device: this.getDeviceLabel(agent),
-      },
-      create: {
-        token: v4(),
-        exp: add(new Date(), { months: 1 }),
-        userId,
-        userAgent: agent,
-        ip,
-        deviceId,
-        device: this.getDeviceLabel(agent),
-      },
+    // Reset any existing token for this device/userAgent to avoid upsert races.
+    return this.prismaService.$transaction(async (tx) => {
+      await tx.token.deleteMany({ where: deviceWhere });
+      return tx.token.create({
+        data: {
+          token: v4(),
+          exp: add(new Date(), { months: 1 }),
+          userId,
+          userAgent: agent,
+          ip,
+          deviceId,
+          device: this.getDeviceLabel(agent),
+        },
+      });
     });
   }
 
@@ -180,7 +163,7 @@ export class AuthService {
     const userExist = await this.userService.findOne(email);
     if (userExist) {
       const user = await this.userService
-        .save({ email, provider: provider })
+        .save({ email, provider: provider, isVerified: true })
         .catch((err) => {
           this.logger.error(err);
           return null;
@@ -188,7 +171,7 @@ export class AuthService {
       this.generateTokens(user, agent, ip, deviceId);
     }
     const user = await this.userService
-      .save({ email, provider: provider })
+      .save({ email, provider: provider, isVerified: true })
       .catch((err) => {
         this.logger.error(err);
         return null;
@@ -274,9 +257,7 @@ export class AuthService {
     const { count } = await this.prismaService.token.deleteMany({
       where: {
         userId,
-        NOT: deviceId
-          ? { userAgent: agent, deviceId }
-          : { userAgent: agent },
+        NOT: deviceId ? { userAgent: agent, deviceId } : { userAgent: agent },
       },
     });
     return count;

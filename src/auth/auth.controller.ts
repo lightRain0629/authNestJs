@@ -41,7 +41,7 @@ import { HttpService } from '@nestjs/axios';
 import { map, mergeMap } from 'rxjs';
 import { handleTimeoutAndErrors } from '@common/src/helpers';
 import { YandexGuard } from './guards/yandex.guard';
-import { Throttle } from '@nestjs/throttler';
+
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -69,7 +69,6 @@ export class AuthController {
   @UseInterceptors(ClassSerializerInterceptor)
   @Post('register')
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Register a new user' })
   @ApiCreatedResponse({
     description: 'User successfully registered',
@@ -87,7 +86,6 @@ export class AuthController {
   }
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Public()
   @ApiOperation({ summary: 'Authenticate user credentials' })
   @ApiCreatedResponse({
@@ -119,7 +117,6 @@ export class AuthController {
   }
 
   @Get('refresh-tokens')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Public()
   @ApiOperation({ summary: 'Refresh access and refresh tokens' })
   @ApiCookieAuth('refreshtoken')
@@ -208,9 +205,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Handle Google OAuth callback' })
   googleAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
-    return res.redirect(
-      `http://localhost:3000/api/auth/success-google?token=${token}`,
-    );
+    return res.redirect(`http://localhost:5173/oauth/google?token=${token}`);
   }
 
   @Get('success-google')
@@ -259,9 +254,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Handle Yandex OAuth callback' })
   yandexAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
-    return res.redirect(
-      `http://localhost:3000/api/auth/success-yandex?token=${token}`,
-    );
+    return res.redirect(`http://localhost:5173/oauth/yandex?token=${token}`);
   }
 
   @Get('success-yandex')
@@ -300,7 +293,6 @@ export class AuthController {
 
   @Post('forgot-password')
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Initiate forgot password flow' })
   @ApiOkResponse({
     description:
@@ -316,7 +308,6 @@ export class AuthController {
 
   @Post('reset-password')
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Complete password reset with token' })
   @ApiOkResponse({ description: 'Password updated and sessions invalidated' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
@@ -326,7 +317,6 @@ export class AuthController {
 
   @Post('verify-email')
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Verify email with OTP code' })
   @ApiOkResponse({ description: 'Email verified' })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
@@ -335,7 +325,6 @@ export class AuthController {
 
   @Post('resend-otp')
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Resend verification OTP code' })
   @ApiOkResponse({ description: 'OTP resent if user exists' })
   async resendOtp(@Body() dto: ResendOtpDto) {
@@ -343,7 +332,6 @@ export class AuthController {
   }
 
   @Delete('sessions/others')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Invalidate all sessions except the current one' })
   @ApiOkResponse({
@@ -360,7 +348,6 @@ export class AuthController {
   }
 
   @Delete('sessions')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth('access-token')
   @ApiCookieAuth('refreshtoken')
   @ApiOperation({
@@ -392,7 +379,6 @@ export class AuthController {
   }
 
   @Get('sessions')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'List active sessions with device information' })
   @ApiOkResponse({

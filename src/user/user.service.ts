@@ -29,12 +29,14 @@ export class UserService {
         roles: user?.roles ?? undefined,
         provider: user?.provider ?? undefined,
         isBlocked: user?.isBlocked ?? undefined,
+        isVerified: user?.isVerified ?? undefined,
       },
       create: {
         email: user.email,
         password: hashedPassword,
         roles: ['USER'],
         provider: user?.provider,
+        isVerified: user?.isVerified ?? false,
       },
     });
     // await this.cacheManager.set(savedUser.id, savedUser);
