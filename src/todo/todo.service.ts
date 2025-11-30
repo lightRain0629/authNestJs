@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { Todo } from '@prisma/client';
+import { Prisma, Todo } from '@prisma/client';
 import { CreateTodoDto, UpdateTodoDto } from './dto';
 
 @Injectable()
@@ -16,16 +16,39 @@ export class TodoService {
     });
   }
 
-  findAll(userId: string): Promise<Todo[]> {
-    return this.prismaService.todo.findMany({
-      where: {
-        userId,
-        isDeleted: false,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+  async findAll(userId: string, page = 1, limit = 10, query?: string) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, limit);
+    const skip = (safePage - 1) * safeLimit;
+
+    const where: Prisma.TodoWhereInput = {
+      userId,
+      isDeleted: false,
+      ...(query
+        ? {
+            title: {
+              contains: query,
+              mode: 'insensitive',
+            },
+          }
+        : undefined),
+    };
+
+    const [items, total] = await this.prismaService.$transaction([
+      this.prismaService.todo.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: safeLimit,
+      }),
+      this.prismaService.todo.count({
+        where,
+      }),
+    ]);
+
+    return { items, total };
   }
 
   async findOne(id: string, userId: string): Promise<Todo> {

@@ -6,8 +6,12 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  ParseIntPipe,
+  DefaultValuePipe,
   Patch,
   Post,
+  Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { TodoService } from './todo.service';
@@ -18,15 +22,21 @@ import { TodoResponse } from './responses';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
+import { buildPagination, PaginationResult } from '@common/src/helpers';
+import { Request } from 'express';
 
 @ApiTags('todo')
 @ApiBearerAuth('access-token')
 @Controller('todos')
+@ApiExtraModels(TodoResponse)
 @UseInterceptors(ClassSerializerInterceptor)
 export class TodoController {
   constructor(private readonly todoService: TodoService) {}
@@ -44,10 +54,55 @@ export class TodoController {
 
   @Get()
   @ApiOperation({ summary: 'List all todos for the current user' })
-  @ApiOkResponse({ type: TodoResponse, isArray: true })
-  async findAll(@CurrentUser() user: JwtPayload): Promise<TodoResponse[]> {
-    const todos = await this.todoService.findAll(user.id);
-    return todos.map((todo) => new TodoResponse(todo));
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({ name: 'query', required: false, type: String, description: 'Filter todos by title' })
+  @ApiOkResponse({
+    description: 'Paginated todos for current user',
+    schema: {
+      allOf: [
+        {
+          type: 'object',
+          properties: {
+            count: { type: 'number' },
+            current_page: { type: 'number' },
+            total_pages: { type: 'number' },
+            next: { type: 'string', nullable: true },
+            previous: { type: 'string', nullable: true },
+            results: {
+              type: 'array',
+              items: { $ref: getSchemaPath(TodoResponse) },
+            },
+          },
+        },
+      ],
+    },
+  })
+  async findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Req() req: Request,
+    @Query('query') search?: string,
+  ): Promise<PaginationResult<TodoResponse>> {
+    const { items, total } = await this.todoService.findAll(
+      user.id,
+      page,
+      limit,
+      search,
+    );
+    const todos = items.map((todo) => new TodoResponse(todo));
+    const path = req.originalUrl.split('?')[0];
+    const queryString = search ? `query=${encodeURIComponent(search)}` : undefined;
+    return buildPagination({
+      data: todos,
+      total,
+      page,
+      limit,
+      queryString,
+      extraParams: { query: search },
+      path,
+    });
   }
 
   @Get(':id')

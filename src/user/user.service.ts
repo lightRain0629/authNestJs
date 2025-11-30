@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { Role, User } from '@prisma/client';
+import { Prisma, Role, User } from '@prisma/client';
 import { PrismaService } from '@prisma/prisma.service';
 import { genSaltSync, hashSync } from 'bcrypt';
 import { JwtPayload } from 'src/auth/interfaces';
@@ -76,8 +76,52 @@ export class UserService {
     return user;
   }
 
-  async findAll() {
-    return this.prismaService.user.findMany();
+  async findAll(page = 1, limit = 10, query?: string) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, limit);
+    const skip = (safePage - 1) * safeLimit;
+
+    const where: Prisma.UserWhereInput | undefined = query
+      ? {
+          OR: [
+            {
+              email: {
+                contains: query,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
+            {
+              id: {
+                contains: query,
+              },
+            },
+          ],
+        }
+      : undefined;
+
+    const [items, total] = await this.prismaService.$transaction([
+      this.prismaService.user.findMany({
+        skip,
+        take: safeLimit,
+        where,
+      }),
+      this.prismaService.user.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async updatePartial(id: string, data: Partial<User>) {
+    const { password, id: _omit, ...rest } = data;
+    const hashedPassword = password ? this.hashPassword(password) : undefined;
+
+    return this.prismaService.user.update({
+      where: { id },
+      data: {
+        ...rest,
+        password: hashedPassword,
+      },
+    });
   }
 
   async delete(id: string, user: JwtPayload) {
