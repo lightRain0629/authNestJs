@@ -39,8 +39,10 @@ export class UserService {
         isVerified: user?.isVerified ?? false,
       },
     });
-    // await this.cacheManager.set(savedUser.id, savedUser);
-    // await this.cacheManager.set(savedUser.email, savedUser);
+    await Promise.all([
+      this.cacheManager.del(savedUser.id),
+      this.cacheManager.del(savedUser.email),
+    ]);
     return savedUser;
   }
 
@@ -69,7 +71,7 @@ export class UserService {
       await this.cacheManager.set(
         idOrEmail,
         user,
-        convertToSecondsUtil(this.configService.get('JWT_EXP')),
+        convertToSecondsUtil(this.configService.get('JWT_EXP', '5m')),
       );
       return user;
     }
@@ -108,20 +110,31 @@ export class UserService {
       this.prismaService.user.count({ where }),
     ]);
 
-    return { items, total };
+    const safeItems = items.map(({ password, ...rest }) => ({
+      ...rest,
+      password: undefined,
+    })) as User[];
+
+    return { items: safeItems, total };
   }
 
   async updatePartial(id: string, data: Partial<User>) {
     const { password, id: _omit, ...rest } = data;
     const hashedPassword = password ? this.hashPassword(password) : undefined;
 
-    return this.prismaService.user.update({
+    const updated = await this.prismaService.user.update({
       where: { id },
       data: {
         ...rest,
         password: hashedPassword,
       },
     });
+
+    await Promise.all([
+      this.cacheManager.del(updated.id),
+      this.cacheManager.del(updated.email),
+    ]);
+    return updated;
   }
 
   async delete(id: string, user: JwtPayload) {

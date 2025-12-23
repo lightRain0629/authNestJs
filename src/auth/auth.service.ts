@@ -160,16 +160,6 @@ export class AuthService {
     ip?: string,
     deviceId?: string,
   ) {
-    const userExist = await this.userService.findOne(email);
-    if (userExist) {
-      const user = await this.userService
-        .save({ email, provider: provider, isVerified: true })
-        .catch((err) => {
-          this.logger.error(err);
-          return null;
-        });
-      this.generateTokens(user, agent, ip, deviceId);
-    }
     const user = await this.userService
       .save({ email, provider: provider, isVerified: true })
       .catch((err) => {
@@ -207,7 +197,7 @@ export class AuthService {
     });
 
     this.logger.log(
-      `Password reset token for ${email}: ${token}. Valid for ${this.resetTokenTtlMinutes} minutes.`,
+      `Password reset token issued for ${email}. Valid for ${this.resetTokenTtlMinutes} minutes.`,
     );
 
     await this.mailerService.sendMail({

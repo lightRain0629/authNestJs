@@ -32,7 +32,7 @@ import { MailerModule } from 'src/mailer/mailer.module';
     ThrottlerModule.forRoot([
       {
         name: 'auth',
-        ttl: 6000, // 6 секунд
+        ttl: 60, // 60 секунд
         limit: 10, // 10 запросов в минуту для auth эндпоинтов
       },
     ]),
