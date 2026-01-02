@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { Role, User } from '@prisma/client';
+import { Prisma, Role, User } from '@prisma/client';
 import { PrismaService } from '@prisma/prisma.service';
 import { genSaltSync, hashSync } from 'bcrypt';
 import { JwtPayload } from 'src/auth/interfaces';
@@ -29,16 +29,20 @@ export class UserService {
         roles: user?.roles ?? undefined,
         provider: user?.provider ?? undefined,
         isBlocked: user?.isBlocked ?? undefined,
+        isVerified: user?.isVerified ?? undefined,
       },
       create: {
         email: user.email,
         password: hashedPassword,
         roles: ['USER'],
         provider: user?.provider,
+        isVerified: user?.isVerified ?? false,
       },
     });
-    // await this.cacheManager.set(savedUser.id, savedUser);
-    // await this.cacheManager.set(savedUser.email, savedUser);
+    await Promise.all([
+      this.cacheManager.del(savedUser.id),
+      this.cacheManager.del(savedUser.email),
+    ]);
     return savedUser;
   }
 
@@ -67,15 +71,70 @@ export class UserService {
       await this.cacheManager.set(
         idOrEmail,
         user,
-        convertToSecondsUtil(this.configService.get('JWT_EXP')),
+        convertToSecondsUtil(this.configService.get('JWT_EXP', '5m')),
       );
       return user;
     }
     return user;
   }
 
-  async findAll() {
-    return this.prismaService.user.findMany();
+  async findAll(page = 1, limit = 10, query?: string) {
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.max(1, limit);
+    const skip = (safePage - 1) * safeLimit;
+
+    const where: Prisma.UserWhereInput | undefined = query
+      ? {
+          OR: [
+            {
+              email: {
+                contains: query,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
+            {
+              id: {
+                contains: query,
+              },
+            },
+          ],
+        }
+      : undefined;
+
+    const [items, total] = await this.prismaService.$transaction([
+      this.prismaService.user.findMany({
+        skip,
+        take: safeLimit,
+        where,
+      }),
+      this.prismaService.user.count({ where }),
+    ]);
+
+    const safeItems = items.map(({ password, ...rest }) => ({
+      ...rest,
+      password: undefined,
+    })) as User[];
+
+    return { items: safeItems, total };
+  }
+
+  async updatePartial(id: string, data: Partial<User>) {
+    const { password, id: _omit, ...rest } = data;
+    const hashedPassword = password ? this.hashPassword(password) : undefined;
+
+    const updated = await this.prismaService.user.update({
+      where: { id },
+      data: {
+        ...rest,
+        password: hashedPassword,
+      },
+    });
+
+    await Promise.all([
+      this.cacheManager.del(updated.id),
+      this.cacheManager.del(updated.email),
+    ]);
+    return updated;
   }
 
   async delete(id: string, user: JwtPayload) {

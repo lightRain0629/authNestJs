@@ -22,7 +22,7 @@ export function convertToSecondsUtil(timeStr: string) {
       multiplier = 60 * 60 * 24 * 30;
       break;
     case 'y':
-      multiplier = 60 * 60 * 24 * 30 * 365;
+      multiplier = 60 * 60 * 24 * 365;
       break;
 
     default:

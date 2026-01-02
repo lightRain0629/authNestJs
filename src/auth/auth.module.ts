@@ -10,6 +10,7 @@ import { GUARDS } from './guards';
 import { HttpModule } from '@nestjs/axios';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { MailerModule } from 'src/mailer/mailer.module';
 
 @Module({
   controllers: [AuthController],
@@ -27,10 +28,11 @@ import { APP_GUARD } from '@nestjs/core';
     JwtModule.registerAsync(options()),
     UserModule,
     HttpModule,
+    MailerModule,
     ThrottlerModule.forRoot([
       {
         name: 'auth',
-        ttl: 60000, // 1 минута
+        ttl: 60, // 60 секунд
         limit: 10, // 10 запросов в минуту для auth эндпоинтов
       },
     ]),

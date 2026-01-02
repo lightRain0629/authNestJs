@@ -30,8 +30,8 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/throttler": "^6.4.0",
     "@nestjs/swagger": "^7.1.18",
+    "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.16.3",
     "@types/passport-jwt": "^3.0.13",
     "axios": "^1.6.2",
@@ -41,6 +41,7 @@
     "class-validator": "^0.14.0",
     "cookie-parser": "^1.4.6",
     "date-fns": "^3.0.1",
+    "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
@@ -49,6 +50,7 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
+    "ua-parser-js": "^2.0.6",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
@@ -60,6 +62,7 @@
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.2",
     "@types/node": "^20.3.1",
+    "@types/nodemailer": "^7.0.4",
     "@types/supertest": "^2.0.12",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -98,7 +101,16 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
-      "^@common/common(|/.*)$": "<rootDir>/libs/common/src/$1"
+      "^@prisma/client$": "<rootDir>/node_modules/@prisma/client",
+      "^@common/src/(.*)$": "<rootDir>/libs/common/src/$1",
+      "^@common$": "<rootDir>/libs/common",
+      "^@common/(.*)$": "<rootDir>/libs/common/$1",
+      "^@prisma$": "<rootDir>/src/prisma",
+      "^@prisma/(?!client)(.*)$": "<rootDir>/src/prisma/$1",
+      "^@user$": "<rootDir>/src/user",
+      "^@user/(.*)$": "<rootDir>/src/user/$1",
+      "^@auth$": "<rootDir>/libs/auth",
+      "^@auth/(.*)$": "<rootDir>/libs/auth/$1"
     }
   }
 }

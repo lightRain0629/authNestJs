@@ -27,6 +27,9 @@ export class UserResponse implements User {
   @Exclude()
   isBlocked: boolean;
 
+  @ApiProperty({ default: false })
+  isVerified: boolean;
+
   constructor(user: User) {
     Object.assign(this, user);
   }
