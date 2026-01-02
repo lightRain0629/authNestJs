@@ -21,8 +21,12 @@ model User {
   PasswordReset PasswordReset[]
   EmailOtp  EmailOtp[]
 
+  todos               Todo[]
+  financeArticles     FinanceArticle[]
+  financeRecords      FinanceRecord[]
+  currencyConversions CurrencyConversion[]
+
   @@map("users")
-  todos Todo[]
 }
 
 model Token {
@@ -76,15 +80,106 @@ enum Provider {
   YANDEX
 }
 
+enum FinanceArticleKind {
+  EXPENSE
+  INCOME
+}
+
+enum FinanceRecordType {
+  EXPENSE
+  INCOME
+}
+
 model Todo {
-  id        String   @id @default(uuid())
-  title     String
+  id          String   @id @default(uuid())
+  title       String
   isCompleted Boolean  @default(false) @map("is_completed")
-  isDeleted Boolean  @default(false) @map("is_deleted")
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("todos")
+}
+
+// Finance Models
+
+model FinanceArticle {
+  id         String             @id @default(uuid())
+  userId     String             @map("user_id")
+  kind       FinanceArticleKind
+  name       String
+  color      String?
+  isArchived Boolean            @default(false) @map("is_archived")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records FinanceRecord[]
+
+  @@unique([userId, kind, name], map: "finance_articles_user_kind_name_unique")
+  @@index([userId, kind])
+  @@map("finance_articles")
+}
+
+model FinanceRecord {
+  id            String            @id @default(uuid())
+  userId        String            @map("user_id")
+  type          FinanceRecordType
+  amount        Decimal           @db.Decimal(18, 4)
+  currency      String            @db.VarChar(3)
+  articleId     String?           @map("article_id")
+  remark        String?
+  operationDate DateTime          @map("operation_date")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article FinanceArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@index([userId, operationDate])
+  @@index([userId, type])
+  @@index([articleId])
+  @@map("finance_records")
+}
+
+model CurrencyRate {
+  id            String   @id @default(uuid())
+  baseCurrency  String   @map("base_currency") @db.VarChar(3)
+  quoteCurrency String   @map("quote_currency") @db.VarChar(3)
+  rate          Decimal  @db.Decimal(18, 8)
+  source        String?
+  effectiveAt   DateTime @map("effective_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  conversions CurrencyConversion[]
+
+  @@index([baseCurrency, quoteCurrency, effectiveAt])
+  @@map("currency_rates")
+}
+
+model CurrencyConversion {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  fromAmount    Decimal  @map("from_amount") @db.Decimal(18, 4)
+  fromCurrency  String   @map("from_currency") @db.VarChar(3)
+  toAmount      Decimal  @map("to_amount") @db.Decimal(18, 4)
+  toCurrency    String   @map("to_currency") @db.VarChar(3)
+  rateUsed      Decimal  @map("rate_used") @db.Decimal(18, 8)
+  rateId        String?  @map("rate_id")
+  feeAmount     Decimal? @map("fee_amount") @db.Decimal(18, 4)
+  feeCurrency   String?  @map("fee_currency") @db.VarChar(3)
+  remark        String?
+  operationDate DateTime @map("operation_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rate CurrencyRate? @relation(fields: [rateId], references: [id], onDelete: SetNull)
+
+  @@index([userId, operationDate])
+  @@index([fromCurrency, toCurrency])
+  @@map("currency_conversions")
 }

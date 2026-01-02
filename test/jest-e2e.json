@@ -11,7 +11,16 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "@common/common/(.*)": "<rootDir>/../libs/common/src/$1",
-    "@common/common": "<rootDir>/../libs/common/src"
+    "^@prisma/client$": "<rootDir>/../node_modules/@prisma/client",
+    "^@common/src/(.*)$": "<rootDir>/../libs/common/src/$1",
+    "^@common$": "<rootDir>/../libs/common",
+    "^@common/(.*)$": "<rootDir>/../libs/common/$1",
+    "^@prisma$": "<rootDir>/../src/prisma",
+    "^@prisma/(?!client)(.*)$": "<rootDir>/../src/prisma/$1",
+    "^@user$": "<rootDir>/../src/user",
+    "^@user/(.*)$": "<rootDir>/../src/user/$1",
+    "^@auth$": "<rootDir>/../libs/auth",
+    "^@auth/(.*)$": "<rootDir>/../libs/auth/$1",
+    "^src/(.*)$": "<rootDir>/../src/$1"
   }
 }
