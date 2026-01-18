@@ -11,20 +11,19 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const configService = app.get(ConfigService);
-  const isDevelopment = configService.get('NODE_ENV', 'development') === 'development';
-  if (isDevelopment) {
-    app.enableCors({
-      origin: true,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'x-device-id',
-        'device-id',
-      ],
-    });
-  }
+  const frontendUrl = configService.get('FRONTEND_URL', 'http://localhost:5173');
+
+  app.enableCors({
+    origin: [frontendUrl, 'http://localhost:5173', 'http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-device-id',
+      'device-id',
+    ],
+  });
 
   // Включаем глобальную валидацию
   app.useGlobalPipes(
