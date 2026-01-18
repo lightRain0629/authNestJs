@@ -1,4 +1,4 @@
-FROM postgres:12
+FROM postgres:16
 
 RUN apt-get clean && apt-get update && \
     apt-get install -y postgresql-contrib
