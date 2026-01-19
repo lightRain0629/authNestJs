@@ -26,6 +26,7 @@ export class ConversionService {
     let rateLookup;
     try {
       rateLookup = await this.rateService.findRateForDate(
+        userId,
         fromCurrency,
         toCurrency,
         operationDate,

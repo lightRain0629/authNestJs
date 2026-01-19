@@ -13,9 +13,10 @@ export interface RateLookupResult {
 export class RateService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateRateDto): Promise<CurrencyRate> {
+  async create(userId: string, dto: CreateRateDto): Promise<CurrencyRate> {
     return this.prisma.currencyRate.create({
       data: {
+        userId,
         baseCurrency: dto.baseCurrency.toUpperCase(),
         quoteCurrency: dto.quoteCurrency.toUpperCase(),
         rate: new Prisma.Decimal(dto.rate),
@@ -25,8 +26,9 @@ export class RateService {
     });
   }
 
-  async findAll(query: ListRatesDto): Promise<CurrencyRate[]> {
+  async findAll(userId: string, query: ListRatesDto): Promise<CurrencyRate[]> {
     const where: Prisma.CurrencyRateWhereInput = {
+      userId,
       ...(query.base ? { baseCurrency: query.base.toUpperCase() } : {}),
       ...(query.quote ? { quoteCurrency: query.quote.toUpperCase() } : {}),
       ...(query.from || query.to
@@ -46,9 +48,10 @@ export class RateService {
     });
   }
 
-  async findLatest(query: LatestRateDto): Promise<RateLookupResult> {
+  async findLatest(userId: string, query: LatestRateDto): Promise<RateLookupResult> {
     const targetDate = query.asOf ? new Date(query.asOf) : new Date();
     return this.findRateForDate(
+      userId,
       query.base.toUpperCase(),
       query.quote.toUpperCase(),
       targetDate,
@@ -56,12 +59,14 @@ export class RateService {
   }
 
   async findRateForDate(
+    userId: string,
     fromCurrency: string,
     toCurrency: string,
     targetDate: Date,
   ): Promise<RateLookupResult> {
     const directRate = await this.prisma.currencyRate.findFirst({
       where: {
+        userId,
         baseCurrency: fromCurrency,
         quoteCurrency: toCurrency,
         effectiveAt: { lte: targetDate },
@@ -79,6 +84,7 @@ export class RateService {
 
     const inverseRate = await this.prisma.currencyRate.findFirst({
       where: {
+        userId,
         baseCurrency: toCurrency,
         quoteCurrency: fromCurrency,
         effectiveAt: { lte: targetDate },
@@ -100,9 +106,9 @@ export class RateService {
     );
   }
 
-  async findById(id: string): Promise<CurrencyRate> {
-    const rate = await this.prisma.currencyRate.findUnique({
-      where: { id },
+  async findById(id: string, userId: string): Promise<CurrencyRate> {
+    const rate = await this.prisma.currencyRate.findFirst({
+      where: { id, userId },
     });
 
     if (!rate) {

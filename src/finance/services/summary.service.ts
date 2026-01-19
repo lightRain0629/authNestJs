@@ -88,6 +88,7 @@ export class SummaryService {
 
       for (const [currency, amount] of Object.entries(income)) {
         const converted = await this.convertToBase(
+          userId,
           new Prisma.Decimal(amount),
           currency,
           baseCurrency,
@@ -98,6 +99,7 @@ export class SummaryService {
 
       for (const [currency, amount] of Object.entries(expense)) {
         const converted = await this.convertToBase(
+          userId,
           new Prisma.Decimal(amount),
           currency,
           baseCurrency,
@@ -115,6 +117,7 @@ export class SummaryService {
   }
 
   private async convertToBase(
+    userId: string,
     amount: Prisma.Decimal,
     fromCurrency: string,
     baseCurrency: string,
@@ -126,6 +129,7 @@ export class SummaryService {
 
     try {
       const rateLookup = await this.rateService.findRateForDate(
+        userId,
         fromCurrency,
         baseCurrency,
         asOfDate,

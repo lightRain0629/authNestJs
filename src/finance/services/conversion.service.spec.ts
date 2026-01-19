@@ -56,6 +56,7 @@ describe('ConversionService', () => {
     it('should create conversion using direct rate', async () => {
       const mockRate: CurrencyRate = {
         id: 'rate-1',
+        userId,
         baseCurrency: 'USD',
         quoteCurrency: 'EUR',
         rate: new Prisma.Decimal('0.92'),
@@ -101,6 +102,7 @@ describe('ConversionService', () => {
 
       expect(result).toEqual(mockConversion);
       expect(rateService.findRateForDate).toHaveBeenCalledWith(
+        userId,
         'USD',
         'EUR',
         new Date('2024-01-15T00:00:00Z'),
@@ -110,6 +112,7 @@ describe('ConversionService', () => {
     it('should create conversion with fee', async () => {
       const mockRate: CurrencyRate = {
         id: 'rate-1',
+        userId,
         baseCurrency: 'USD',
         quoteCurrency: 'TMT',
         rate: new Prisma.Decimal('3.5'),
@@ -176,6 +179,7 @@ describe('ConversionService', () => {
     it('should use inverse rate when direct not available', async () => {
       const mockInverseRate: CurrencyRate = {
         id: 'rate-2',
+        userId,
         baseCurrency: 'EUR',
         quoteCurrency: 'USD',
         rate: new Prisma.Decimal('1.0869565'),

@@ -13,6 +13,8 @@ const mockPrisma = () => ({
   },
 });
 
+const TEST_USER_ID = 'test-user-id';
+
 describe('RateService', () => {
   let service: RateService;
   let prisma: ReturnType<typeof mockPrisma>;
@@ -40,6 +42,7 @@ describe('RateService', () => {
     it('should find direct rate USD/EUR', async () => {
       const directRate: CurrencyRate = {
         id: 'rate-1',
+        userId: TEST_USER_ID,
         baseCurrency: 'USD',
         quoteCurrency: 'EUR',
         rate: new Prisma.Decimal('0.92'),
@@ -51,7 +54,7 @@ describe('RateService', () => {
 
       prisma.currencyRate.findFirst.mockResolvedValueOnce(directRate);
 
-      const result = await service.findRateForDate('USD', 'EUR', mockDate);
+      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', mockDate);
 
       expect(result.rate).toEqual(directRate);
       expect(result.effectiveRate.toString()).toBe('0.92');
@@ -59,6 +62,7 @@ describe('RateService', () => {
 
       expect(prisma.currencyRate.findFirst).toHaveBeenCalledWith({
         where: {
+          userId: TEST_USER_ID,
           baseCurrency: 'USD',
           quoteCurrency: 'EUR',
           effectiveAt: { lte: mockDate },
@@ -70,6 +74,7 @@ describe('RateService', () => {
     it('should find inverse rate when direct not available', async () => {
       const inverseRate: CurrencyRate = {
         id: 'rate-2',
+        userId: TEST_USER_ID,
         baseCurrency: 'EUR',
         quoteCurrency: 'USD',
         rate: new Prisma.Decimal('1.0869565217'),
@@ -84,7 +89,7 @@ describe('RateService', () => {
       // Inverse lookup returns the rate
       prisma.currencyRate.findFirst.mockResolvedValueOnce(inverseRate);
 
-      const result = await service.findRateForDate('USD', 'EUR', mockDate);
+      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', mockDate);
 
       expect(result.rate).toEqual(inverseRate);
       expect(result.isInverse).toBe(true);
@@ -97,17 +102,18 @@ describe('RateService', () => {
       prisma.currencyRate.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.findRateForDate('USD', 'TMT', mockDate),
+        service.findRateForDate(TEST_USER_ID, 'USD', 'TMT', mockDate),
       ).rejects.toThrow(NotFoundException);
 
       await expect(
-        service.findRateForDate('USD', 'TMT', mockDate),
+        service.findRateForDate(TEST_USER_ID, 'USD', 'TMT', mockDate),
       ).rejects.toThrow('No FX rate found for USD/TMT');
     });
 
     it('should use rate with effectiveAt <= targetDate', async () => {
       const olderRate: CurrencyRate = {
         id: 'rate-3',
+        userId: TEST_USER_ID,
         baseCurrency: 'USD',
         quoteCurrency: 'EUR',
         rate: new Prisma.Decimal('0.90'),
@@ -120,11 +126,12 @@ describe('RateService', () => {
       prisma.currencyRate.findFirst.mockResolvedValueOnce(olderRate);
 
       const targetDate = new Date('2024-01-12T00:00:00Z');
-      const result = await service.findRateForDate('USD', 'EUR', targetDate);
+      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', targetDate);
 
       expect(result.rate.effectiveAt).toEqual(olderRate.effectiveAt);
       expect(prisma.currencyRate.findFirst).toHaveBeenCalledWith({
         where: {
+          userId: TEST_USER_ID,
           baseCurrency: 'USD',
           quoteCurrency: 'EUR',
           effectiveAt: { lte: targetDate },
@@ -138,6 +145,7 @@ describe('RateService', () => {
     it('should create a rate with normalized currencies', async () => {
       const mockRate: CurrencyRate = {
         id: 'rate-new',
+        userId: TEST_USER_ID,
         baseCurrency: 'USD',
         quoteCurrency: 'EUR',
         rate: new Prisma.Decimal('0.92'),
@@ -149,7 +157,7 @@ describe('RateService', () => {
 
       prisma.currencyRate.create.mockResolvedValue(mockRate);
 
-      const result = await service.create({
+      const result = await service.create(TEST_USER_ID, {
         baseCurrency: 'usd', // lowercase should be normalized
         quoteCurrency: 'eur',
         rate: '0.92',
@@ -160,6 +168,7 @@ describe('RateService', () => {
       expect(result).toEqual(mockRate);
       expect(prisma.currencyRate.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
+          userId: TEST_USER_ID,
           baseCurrency: 'USD',
           quoteCurrency: 'EUR',
         }),

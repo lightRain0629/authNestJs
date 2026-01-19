@@ -25,6 +25,7 @@ model User {
   financeArticles     FinanceArticle[]
   financeRecords      FinanceRecord[]
   currencyConversions CurrencyConversion[]
+  currencyRates       CurrencyRate[]
 
   @@map("users")
 }
@@ -146,6 +147,7 @@ model FinanceRecord {
 
 model CurrencyRate {
   id            String   @id @default(uuid())
+  userId        String   @map("user_id")
   baseCurrency  String   @map("base_currency") @db.VarChar(3)
   quoteCurrency String   @map("quote_currency") @db.VarChar(3)
   rate          Decimal  @db.Decimal(18, 8)
@@ -154,9 +156,10 @@ model CurrencyRate {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversions CurrencyConversion[]
 
-  @@index([baseCurrency, quoteCurrency, effectiveAt])
+  @@index([userId, baseCurrency, quoteCurrency, effectiveAt])
   @@map("currency_rates")
 }
 
