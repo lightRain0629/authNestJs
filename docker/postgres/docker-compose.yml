@@ -6,13 +6,13 @@ services:
     build: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres_db}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-db_auth}
       PGDATA: ${PGDATA:-/data/postgres}
     volumes:
       - postgres:${PGDATA:-/data/postgres}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5433}:5432"
     networks:
       - postgres
     restart: unless-stopped
