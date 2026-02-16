@@ -83,7 +83,10 @@ describe('UserService', () => {
       },
     });
     expect(result).toEqual({
-      items: users.map(({ password: _pw, ...rest }) => ({ ...rest, password: undefined })),
+      items: users.map(({ password: _pw, ...rest }) => ({
+        ...rest,
+        password: undefined,
+      })),
       total: 1,
     });
   });
