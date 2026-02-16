@@ -1,79 +1,13 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_DB: ${POSTGRES_DB:-db_auth}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/postgres/init-uuid.sql:/docker-entrypoint-initdb.d/init-uuid.sql
-    ports:
-      - "5433:5432"
-    networks:
-      - app_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-db_auth}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: nestjs_app
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-db_auth}?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXP: ${JWT_EXP:-1d}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      YANDEX_APP_ID: ${YANDEX_APP_ID}
-      YANDEX_APP_SECRET: ${YANDEX_APP_SECRET}
-      NODE_ENV: production
-      EMAIL: ${EMAIL}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
-      FRONTEND_URL: ${FRONTEND_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - app_network
-    restart: unless-stopped
-
-  nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    container_name: nginx_proxy
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    depends_on:
-      - app
-    networks:
-      - app_network
+      - "3000:3000"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
-
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-
-networks:
-  app_network:
-    driver: bridge
-
-volumes:
-  postgres_data:
