@@ -82,7 +82,10 @@ describe('UserService', () => {
         ],
       },
     });
-    expect(result).toEqual({ items: users, total: 1 });
+    expect(result).toEqual({
+      items: users.map(({ password: _pw, ...rest }) => ({ ...rest, password: undefined })),
+      total: 1,
+    });
   });
 
   it('hashes password on partial update', async () => {
