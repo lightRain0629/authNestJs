@@ -22,11 +22,7 @@ import {
 import { CurrentUser } from '@common/src/decorators';
 import { JwtPayload } from '../../auth/interfaces';
 import { ArticleService } from '../services';
-import {
-  CreateArticleDto,
-  UpdateArticleDto,
-  ListArticlesDto,
-} from '../dto';
+import { CreateArticleDto, UpdateArticleDto, ListArticlesDto } from '../dto';
 import { ArticleResponse } from '../responses';
 
 @ApiTags('finance/articles')

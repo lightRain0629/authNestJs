@@ -110,7 +110,7 @@ export class UserService {
       this.prismaService.user.count({ where }),
     ]);
 
-    const safeItems = items.map(({ password, ...rest }) => ({
+    const safeItems = items.map(({ password: _password, ...rest }) => ({
       ...rest,
       password: undefined,
     })) as User[];
@@ -119,7 +119,7 @@ export class UserService {
   }
 
   async updatePartial(id: string, data: Partial<User>) {
-    const { password, id: _omit, ...rest } = data;
+    const { password, id: _id, ...rest } = data;
     const hashedPassword = password ? this.hashPassword(password) : undefined;
 
     const updated = await this.prismaService.user.update({

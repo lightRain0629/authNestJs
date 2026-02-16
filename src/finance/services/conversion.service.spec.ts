@@ -72,7 +72,9 @@ describe('ConversionService', () => {
         isInverse: false,
       });
 
-      const expectedToAmount = new Prisma.Decimal('100').mul(new Prisma.Decimal('0.92'));
+      const expectedToAmount = new Prisma.Decimal('100').mul(
+        new Prisma.Decimal('0.92'),
+      );
 
       const mockConversion: CurrencyConversion = {
         id: 'conv-1',
@@ -189,7 +191,9 @@ describe('ConversionService', () => {
         updatedAt: new Date(),
       };
 
-      const inverseEffectiveRate = new Prisma.Decimal(1).div(new Prisma.Decimal('1.0869565'));
+      const inverseEffectiveRate = new Prisma.Decimal(1).div(
+        new Prisma.Decimal('1.0869565'),
+      );
 
       rateService.findRateForDate.mockResolvedValue({
         rate: mockInverseRate,
@@ -231,9 +235,9 @@ describe('ConversionService', () => {
     it('should not allow accessing another user conversions', async () => {
       prisma.currencyConversion.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOne('conv-1', 'other-user'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('conv-1', 'other-user')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should only return user own conversions', async () => {

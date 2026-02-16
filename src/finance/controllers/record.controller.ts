@@ -24,11 +24,7 @@ import { Request } from 'express';
 import { CurrentUser } from '@common/src/decorators';
 import { JwtPayload } from '../../auth/interfaces';
 import { RecordService } from '../services';
-import {
-  CreateRecordDto,
-  UpdateRecordDto,
-  ListRecordsDto,
-} from '../dto';
+import { CreateRecordDto, UpdateRecordDto, ListRecordsDto } from '../dto';
 import { RecordResponse } from '../responses';
 import {
   buildPagination,

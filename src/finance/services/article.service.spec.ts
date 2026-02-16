@@ -31,10 +31,7 @@ describe('ArticleService', () => {
     prisma = mockPrisma();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        ArticleService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [ArticleService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = moduleRef.get(ArticleService);
@@ -92,17 +89,6 @@ describe('ArticleService', () => {
     });
 
     it('should allow same name for different kinds', async () => {
-      const expenseArticle: FinanceArticle = {
-        id: 'art-1',
-        userId,
-        kind: FinanceArticleKind.EXPENSE,
-        name: 'Bonus',
-        color: null,
-        isArchived: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
       // No existing INCOME article with name "Bonus"
       prisma.financeArticle.findFirst.mockResolvedValue(null);
       prisma.financeArticle.create.mockResolvedValue({
@@ -164,12 +150,22 @@ describe('ArticleService', () => {
       prisma.financeArticle.findFirst.mockResolvedValue(incomeArticle);
 
       await expect(
-        service.validateArticleForRecord('art-1', userId, FinanceArticleKind.EXPENSE),
+        service.validateArticleForRecord(
+          'art-1',
+          userId,
+          FinanceArticleKind.EXPENSE,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       await expect(
-        service.validateArticleForRecord('art-1', userId, FinanceArticleKind.EXPENSE),
-      ).rejects.toThrow('Article kind (INCOME) does not match record type (EXPENSE)');
+        service.validateArticleForRecord(
+          'art-1',
+          userId,
+          FinanceArticleKind.EXPENSE,
+        ),
+      ).rejects.toThrow(
+        'Article kind (INCOME) does not match record type (EXPENSE)',
+      );
     });
 
     it('should reject archived articles', async () => {
@@ -187,11 +183,19 @@ describe('ArticleService', () => {
       prisma.financeArticle.findFirst.mockResolvedValue(archivedArticle);
 
       await expect(
-        service.validateArticleForRecord('art-1', userId, FinanceArticleKind.EXPENSE),
+        service.validateArticleForRecord(
+          'art-1',
+          userId,
+          FinanceArticleKind.EXPENSE,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       await expect(
-        service.validateArticleForRecord('art-1', userId, FinanceArticleKind.EXPENSE),
+        service.validateArticleForRecord(
+          'art-1',
+          userId,
+          FinanceArticleKind.EXPENSE,
+        ),
       ).rejects.toThrow('Cannot use archived article');
     });
 
@@ -199,7 +203,11 @@ describe('ArticleService', () => {
       prisma.financeArticle.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.validateArticleForRecord('art-1', 'other-user', FinanceArticleKind.EXPENSE),
+        service.validateArticleForRecord(
+          'art-1',
+          'other-user',
+          FinanceArticleKind.EXPENSE,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -250,7 +258,7 @@ describe('ArticleService', () => {
       prisma.financeRecord.count.mockResolvedValue(0); // No records
       prisma.financeArticle.delete.mockResolvedValue(article);
 
-      const result = await service.remove('art-1', userId);
+      await service.remove('art-1', userId);
 
       expect(prisma.financeArticle.delete).toHaveBeenCalledWith({
         where: { id: 'art-1' },
@@ -263,9 +271,9 @@ describe('ArticleService', () => {
     it('should not allow accessing another user articles', async () => {
       prisma.financeArticle.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOne('art-1', 'other-user'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('art-1', 'other-user')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

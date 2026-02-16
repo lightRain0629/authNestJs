@@ -42,7 +42,8 @@ export class CreateRateDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d+(\.\d{1,8})?$/, {
-    message: 'Rate must be a positive decimal string with up to 8 decimal places',
+    message:
+      'Rate must be a positive decimal string with up to 8 decimal places',
   })
   rate: string;
 

@@ -49,14 +49,19 @@ export class ConversionController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List currency conversions with filters and pagination' })
+  @ApiOperation({
+    summary: 'List currency conversions with filters and pagination',
+  })
   @ApiOkResponse({ description: 'Paginated list of conversions' })
   async findAll(
     @CurrentUser() user: JwtPayload,
     @Query() query: ListConversionsDto,
     @Req() req: Request,
   ): Promise<PaginationResult<ConversionResponse>> {
-    const { items, total } = await this.conversionService.findAll(user.id, query);
+    const { items, total } = await this.conversionService.findAll(
+      user.id,
+      query,
+    );
     const conversions = items.map((c) => new ConversionResponse(c));
     const path = req.originalUrl.split('?')[0];
 

@@ -56,7 +56,12 @@ export class TodoController {
   @ApiOperation({ summary: 'List all todos for the current user' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
-  @ApiQuery({ name: 'query', required: false, type: String, description: 'Filter todos by title' })
+  @ApiQuery({
+    name: 'query',
+    required: false,
+    type: String,
+    description: 'Filter todos by title',
+  })
   @ApiOkResponse({
     description: 'Paginated todos for current user',
     schema: {
@@ -93,7 +98,9 @@ export class TodoController {
     );
     const todos = items.map((todo) => new TodoResponse(todo));
     const path = req.originalUrl.split('?')[0];
-    const queryString = search ? `query=${encodeURIComponent(search)}` : undefined;
+    const queryString = search
+      ? `query=${encodeURIComponent(search)}`
+      : undefined;
     return buildPagination({
       data: todos,
       total,

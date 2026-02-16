@@ -28,7 +28,8 @@ export class CreateRecordDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^\d+(\.\d{1,4})?$/, {
-    message: 'Amount must be a positive decimal string with up to 4 decimal places',
+    message:
+      'Amount must be a positive decimal string with up to 4 decimal places',
   })
   amount: string;
 

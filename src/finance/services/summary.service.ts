@@ -14,7 +14,10 @@ export class SummaryService {
     private readonly rateService: RateService,
   ) {}
 
-  async getSummary(userId: string, query: SummaryDto): Promise<SummaryResponse> {
+  async getSummary(
+    userId: string,
+    query: SummaryDto,
+  ): Promise<SummaryResponse> {
     const fromDate = new Date(query.from);
     const toDate = new Date(query.to);
 
@@ -62,7 +65,8 @@ export class SummaryService {
     const conversionFees: Record<string, Prisma.Decimal> = {};
     for (const conv of conversions) {
       if (conv.feeAmount && conv.feeCurrency) {
-        const current = conversionFees[conv.feeCurrency] ?? new Prisma.Decimal(0);
+        const current =
+          conversionFees[conv.feeCurrency] ?? new Prisma.Decimal(0);
         conversionFees[conv.feeCurrency] = current.add(conv.feeAmount);
       }
     }
@@ -78,7 +82,8 @@ export class SummaryService {
     const response: Partial<SummaryResponse> = {
       income,
       expense,
-      conversionFees: Object.keys(feesFormatted).length > 0 ? feesFormatted : undefined,
+      conversionFees:
+        Object.keys(feesFormatted).length > 0 ? feesFormatted : undefined,
     };
 
     if (query.baseCurrency) {

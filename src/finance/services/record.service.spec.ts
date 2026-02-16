@@ -99,7 +99,9 @@ describe('RecordService', () => {
         updatedAt: new Date(),
       };
 
-      const mockRecord: FinanceRecord & { article: { id: string; name: string; kind: string; color: null } } = {
+      const mockRecord: FinanceRecord & {
+        article: { id: string; name: string; kind: string; color: null };
+      } = {
         id: 'rec-2',
         userId,
         type: FinanceRecordType.EXPENSE,
@@ -134,7 +136,9 @@ describe('RecordService', () => {
 
     it('should reject if article kind does not match record type', async () => {
       articleService.validateArticleForRecord.mockRejectedValue(
-        new BadRequestException('Article kind (INCOME) does not match record type (EXPENSE)'),
+        new BadRequestException(
+          'Article kind (INCOME) does not match record type (EXPENSE)',
+        ),
       );
 
       await expect(
@@ -212,9 +216,9 @@ describe('RecordService', () => {
     it('should throw NotFoundException if record belongs to another user', async () => {
       prisma.financeRecord.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findOne('rec-1', 'other-user'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('rec-1', 'other-user')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

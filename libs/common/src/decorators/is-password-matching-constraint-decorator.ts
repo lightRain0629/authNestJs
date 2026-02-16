@@ -14,7 +14,7 @@ export class IsPasswordsMatchingConstraint
     return obj.password === passwordRepeat;
   }
 
-  defaultMessage(validationArguments?: ValidationArguments): string {
+  defaultMessage(_validationArguments?: ValidationArguments): string {
     return 'Passwords does not match';
   }
 }

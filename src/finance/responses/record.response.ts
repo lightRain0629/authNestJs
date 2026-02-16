@@ -1,10 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { FinanceRecord, FinanceRecordType, Prisma } from '@prisma/client';
 import { Exclude, Transform } from 'class-transformer';
-import { ArticleResponse } from './article.response';
 
 type RecordWithArticle = FinanceRecord & {
-  article?: { id: string; name: string; kind: string; color: string | null } | null;
+  article?: {
+    id: string;
+    name: string;
+    kind: string;
+    color: string | null;
+  } | null;
 };
 
 export class RecordResponse {
@@ -40,15 +44,21 @@ export class RecordResponse {
   updatedAt: Date;
 
   @ApiPropertyOptional({ description: 'Article details if included' })
-  article?: { id: string; name: string; kind: string; color: string | null } | null;
+  article?: {
+    id: string;
+    name: string;
+    kind: string;
+    color: string | null;
+  } | null;
 
   constructor(record: RecordWithArticle) {
     this.id = record.id;
     this.userId = record.userId;
     this.type = record.type;
-    this.amount = record.amount instanceof Prisma.Decimal
-      ? record.amount.toString()
-      : String(record.amount);
+    this.amount =
+      record.amount instanceof Prisma.Decimal
+        ? record.amount.toString()
+        : String(record.amount);
     this.currency = record.currency;
     this.articleId = record.articleId;
     this.remark = record.remark;

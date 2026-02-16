@@ -23,10 +23,7 @@ describe('RateService', () => {
     prisma = mockPrisma();
 
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        RateService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [RateService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = moduleRef.get(RateService);
@@ -54,7 +51,12 @@ describe('RateService', () => {
 
       prisma.currencyRate.findFirst.mockResolvedValueOnce(directRate);
 
-      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', mockDate);
+      const result = await service.findRateForDate(
+        TEST_USER_ID,
+        'USD',
+        'EUR',
+        mockDate,
+      );
 
       expect(result.rate).toEqual(directRate);
       expect(result.effectiveRate.toString()).toBe('0.92');
@@ -89,7 +91,12 @@ describe('RateService', () => {
       // Inverse lookup returns the rate
       prisma.currencyRate.findFirst.mockResolvedValueOnce(inverseRate);
 
-      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', mockDate);
+      const result = await service.findRateForDate(
+        TEST_USER_ID,
+        'USD',
+        'EUR',
+        mockDate,
+      );
 
       expect(result.rate).toEqual(inverseRate);
       expect(result.isInverse).toBe(true);
@@ -126,7 +133,12 @@ describe('RateService', () => {
       prisma.currencyRate.findFirst.mockResolvedValueOnce(olderRate);
 
       const targetDate = new Date('2024-01-12T00:00:00Z');
-      const result = await service.findRateForDate(TEST_USER_ID, 'USD', 'EUR', targetDate);
+      const result = await service.findRateForDate(
+        TEST_USER_ID,
+        'USD',
+        'EUR',
+        targetDate,
+      );
 
       expect(result.rate.effectiveAt).toEqual(olderRate.effectiveAt);
       expect(prisma.currencyRate.findFirst).toHaveBeenCalledWith({

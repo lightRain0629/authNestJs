@@ -101,7 +101,7 @@ export class ArticleService {
   }
 
   async remove(id: string, userId: string): Promise<FinanceArticle> {
-    const article = await this.findOne(id, userId);
+    await this.findOne(id, userId);
 
     const recordCount = await this.prisma.financeRecord.count({
       where: { articleId: id },

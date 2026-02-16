@@ -48,7 +48,10 @@ export class RateService {
     });
   }
 
-  async findLatest(userId: string, query: LatestRateDto): Promise<RateLookupResult> {
+  async findLatest(
+    userId: string,
+    query: LatestRateDto,
+  ): Promise<RateLookupResult> {
     const targetDate = query.asOf ? new Date(query.asOf) : new Date();
     return this.findRateForDate(
       userId,

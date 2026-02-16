@@ -11,7 +11,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const configService = app.get(ConfigService);
-  const frontendUrl = configService.get('FRONTEND_URL', 'http://localhost:5173');
+  const frontendUrl = configService.get(
+    'FRONTEND_URL',
+    'http://localhost:5173',
+  );
 
   app.enableCors({
     origin: [frontendUrl, 'http://localhost:5173', 'http://localhost:3000'],

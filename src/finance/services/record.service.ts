@@ -1,16 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRecordDto, UpdateRecordDto, ListRecordsDto } from '../dto';
-import {
-  FinanceRecord,
-  FinanceArticleKind,
-  FinanceRecordType,
-  Prisma,
-} from '@prisma/client';
+import { FinanceRecord, FinanceArticleKind, Prisma } from '@prisma/client';
 import { ArticleService } from './article.service';
 
 type RecordWithArticle = FinanceRecord & {
-  article?: { id: string; name: string; kind: string; color: string | null } | null;
+  article?: {
+    id: string;
+    name: string;
+    kind: string;
+    color: string | null;
+  } | null;
 };
 
 @Injectable()
@@ -20,7 +20,10 @@ export class RecordService {
     private readonly articleService: ArticleService,
   ) {}
 
-  async create(userId: string, dto: CreateRecordDto): Promise<RecordWithArticle> {
+  async create(
+    userId: string,
+    dto: CreateRecordDto,
+  ): Promise<RecordWithArticle> {
     if (dto.articleId) {
       await this.articleService.validateArticleForRecord(
         dto.articleId,
@@ -151,8 +154,10 @@ export class RecordService {
     const updateData: Prisma.FinanceRecordUpdateInput = {};
 
     if (dto.type !== undefined) updateData.type = dto.type;
-    if (dto.amount !== undefined) updateData.amount = new Prisma.Decimal(dto.amount);
-    if (dto.currency !== undefined) updateData.currency = dto.currency.toUpperCase();
+    if (dto.amount !== undefined)
+      updateData.amount = new Prisma.Decimal(dto.amount);
+    if (dto.currency !== undefined)
+      updateData.currency = dto.currency.toUpperCase();
     if (dto.articleId !== undefined) {
       if (dto.articleId === null) {
         updateData.article = { disconnect: true };

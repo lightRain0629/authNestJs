@@ -30,9 +30,10 @@ export class RateResponse {
     this.id = rate.id;
     this.baseCurrency = rate.baseCurrency;
     this.quoteCurrency = rate.quoteCurrency;
-    this.rate = rate.rate instanceof Prisma.Decimal
-      ? rate.rate.toString()
-      : String(rate.rate);
+    this.rate =
+      rate.rate instanceof Prisma.Decimal
+        ? rate.rate.toString()
+        : String(rate.rate);
     this.source = rate.source;
     this.effectiveAt = rate.effectiveAt;
     this.createdAt = rate.createdAt;

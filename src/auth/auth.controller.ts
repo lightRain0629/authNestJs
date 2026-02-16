@@ -205,7 +205,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Handle Google OAuth callback' })
   googleAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
-    return res.redirect(`${this.configService.get('FRONTEND_URL')}/oauth/google?token=${token}`);
+    return res.redirect(
+      `${this.configService.get('FRONTEND_URL')}/oauth/google?token=${token}`,
+    );
   }
 
   @Get('success-google')
@@ -254,7 +256,9 @@ export class AuthController {
   @ApiOperation({ summary: 'Handle Yandex OAuth callback' })
   yandexAuthCallback(@Req() req: Request, @Res() res: Response) {
     const token = req.user['accessToken'];
-    return res.redirect(`${this.configService.get('FRONTEND_URL')}/oauth/yandex?token=${token}`);
+    return res.redirect(
+      `${this.configService.get('FRONTEND_URL')}/oauth/yandex?token=${token}`,
+    );
   }
 
   @Get('success-yandex')
