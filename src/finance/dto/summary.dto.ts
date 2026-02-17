@@ -52,4 +52,16 @@ export class ChartQueryDto {
   @IsDateString()
   @IsNotEmpty()
   to: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Convert all amounts to this currency. If omitted, amounts stay in their original currency.',
+    example: 'USD',
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, {
+    message: 'Currency must be a 3-letter ISO code in uppercase',
+  })
+  baseCurrency?: string;
 }
