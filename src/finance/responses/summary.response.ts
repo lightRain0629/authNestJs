@@ -38,3 +38,38 @@ export class SummaryResponse {
     Object.assign(this, data);
   }
 }
+
+export class ChartItemResponse {
+  @ApiProperty({ description: 'Article (category) ID, null if uncategorized' })
+  articleId: string | null;
+
+  @ApiProperty({ description: 'Category name or "No Category"' })
+  categoryName: string;
+
+  @ApiProperty({ description: 'Category hex color' })
+  categoryColor: string;
+
+  @ApiProperty({ description: 'Total amount as string' })
+  total: string;
+
+  @ApiProperty({ description: 'ISO 4217 currency code' })
+  currency: string;
+
+  @ApiProperty({ description: 'Percentage of total for this currency' })
+  percentage: number;
+}
+
+export class ChartResponse {
+  @ApiProperty({ type: [ChartItemResponse] })
+  items: ChartItemResponse[];
+
+  @ApiProperty({
+    description: 'Grand total per currency',
+    example: { KZT: '795000.0000' },
+  })
+  total: Record<string, string>;
+
+  constructor(data: ChartResponse) {
+    Object.assign(this, data);
+  }
+}

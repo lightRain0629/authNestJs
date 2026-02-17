@@ -14,8 +14,8 @@ import {
 import { CurrentUser } from '@common/src/decorators';
 import { JwtPayload } from '../../auth/interfaces';
 import { SummaryService } from '../services';
-import { SummaryDto } from '../dto';
-import { SummaryResponse } from '../responses';
+import { ChartQueryDto, SummaryDto } from '../dto';
+import { ChartResponse, SummaryResponse } from '../responses';
 
 @ApiTags('finance/summary')
 @ApiBearerAuth('access-token')
@@ -32,5 +32,25 @@ export class SummaryController {
     @Query() query: SummaryDto,
   ): Promise<SummaryResponse> {
     return this.summaryService.getSummary(user.id, query);
+  }
+
+  @Get('chart/expenses')
+  @ApiOperation({ summary: 'Get expense breakdown by category for charts' })
+  @ApiOkResponse({ type: ChartResponse })
+  async getExpenseChart(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ChartQueryDto,
+  ): Promise<ChartResponse> {
+    return this.summaryService.getExpenseChart(user.id, query);
+  }
+
+  @Get('chart/income')
+  @ApiOperation({ summary: 'Get income breakdown by category for charts' })
+  @ApiOkResponse({ type: ChartResponse })
+  async getIncomeChart(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ChartQueryDto,
+  ): Promise<ChartResponse> {
+    return this.summaryService.getIncomeChart(user.id, query);
   }
 }
