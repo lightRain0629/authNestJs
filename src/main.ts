@@ -16,8 +16,13 @@ async function bootstrap() {
     'http://localhost:5173',
   );
 
+  const secondaryFrontendUrl = configService.get(
+    'SECONDARY_FRONTEND_URL',
+    'http://localhost:5173',
+  );
+
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:5173', 'http://localhost:3000'],
+    origin: [frontendUrl, secondaryFrontendUrl],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
