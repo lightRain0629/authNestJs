@@ -240,6 +240,163 @@ describe('AccountService', () => {
     });
   });
 
+  describe('getDebts', () => {
+    const lent = (over: Record<string, unknown> = {}) =>
+      account({
+        id: 'acc-lent',
+        name: 'Lent to Ivan',
+        kind: 'RECEIVABLE',
+        openingBalance: D(3000),
+        ...over,
+      });
+
+    const loan = (over: Record<string, unknown> = {}) =>
+      account({
+        id: 'acc-loan',
+        name: 'Bank loan',
+        kind: 'LOAN',
+        openingBalance: D(-5000),
+        ...over,
+      });
+
+    it('counts money paid back to you as repayment on a receivable', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([lent()]);
+      // computeNativeBalances: outgoing then incoming; the 1200 left the
+      // receivable when Ivan paid it back.
+      prisma.currencyConversion.groupBy
+        .mockResolvedValueOnce([
+          { fromAccountId: 'acc-lent', _sum: { fromAmount: D(1200) } },
+        ])
+        .mockResolvedValueOnce([])
+        // getDebts' own repayment lookup
+        .mockResolvedValueOnce([
+          { fromAccountId: 'acc-lent', _sum: { fromAmount: D(1200) } },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      expect(result.lent).toHaveLength(1);
+      expect(result.lent[0].outstanding).toBe('1800.00');
+      expect(result.lent[0].repaid).toBe('1200.00');
+      // 1200 repaid of a 3000 principal
+      expect(result.lent[0].progress).toBe(40);
+    });
+
+    it('counts money paid into a loan as repayment', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([loan()]);
+      prisma.currencyConversion.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { toAccountId: 'acc-loan', _sum: { toAmount: D(2000) } },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { toAccountId: 'acc-loan', _sum: { toAmount: D(2000) } },
+        ]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      expect(result.owed).toHaveLength(1);
+      expect(result.owed[0].outstanding).toBe('3000.00');
+      expect(result.owed[0].repaid).toBe('2000.00');
+      expect(result.owed[0].progress).toBe(40);
+    });
+  });
+
+  describe('getDebts — repayments booked as records', () => {
+    it('counts an income record on a loan as repayment', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({
+          id: 'acc-loan',
+          name: 'Bank loan',
+          kind: 'LOAN',
+          openingBalance: D(-5000),
+        }),
+      ]);
+      prisma.financeRecord.groupBy.mockResolvedValue([
+        { accountId: 'acc-loan', type: 'INCOME', _sum: { amount: D(2000) } },
+      ]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      expect(result.owed[0].outstanding).toBe('3000.00');
+      expect(result.owed[0].repaid).toBe('2000.00');
+      expect(result.owed[0].progress).toBe(40);
+    });
+
+    it('counts an expense record on a receivable as money returned', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({
+          id: 'acc-lent',
+          name: 'Lent to Ivan',
+          kind: 'RECEIVABLE',
+          openingBalance: D(3000),
+        }),
+      ]);
+      prisma.financeRecord.groupBy.mockResolvedValue([
+        { accountId: 'acc-lent', type: 'EXPENSE', _sum: { amount: D(1200) } },
+      ]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      expect(result.lent[0].outstanding).toBe('1800.00');
+      expect(result.lent[0].repaid).toBe('1200.00');
+      expect(result.lent[0].progress).toBe(40);
+    });
+
+    it('does not treat new borrowing on a credit card as repayment', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({
+          id: 'acc-card',
+          name: 'Credit card',
+          kind: 'CREDIT_CARD',
+          openingBalance: D(0),
+        }),
+      ]);
+      // Spending on the card grows the debt; it is not progress against it.
+      prisma.financeRecord.groupBy.mockResolvedValue([
+        { accountId: 'acc-card', type: 'EXPENSE', _sum: { amount: D(800) } },
+      ]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      expect(result.owed[0].outstanding).toBe('800.00');
+      expect(result.owed[0].repaid).toBe('0.00');
+      expect(result.owed[0].progress).toBe(0);
+    });
+
+    it('adds up a repayment split between a record and a transfer', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({
+          id: 'acc-loan',
+          name: 'Bank loan',
+          kind: 'LOAN',
+          openingBalance: D(-5000),
+        }),
+      ]);
+      prisma.financeRecord.groupBy.mockResolvedValue([
+        { accountId: 'acc-loan', type: 'INCOME', _sum: { amount: D(1000) } },
+      ]);
+      prisma.currencyConversion.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { toAccountId: 'acc-loan', _sum: { toAmount: D(1500) } },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { toAccountId: 'acc-loan', _sum: { toAmount: D(1500) } },
+        ]);
+
+      const result = await service.getDebts(userId, { asOf });
+
+      // -5000 + 1000 record + 1500 transfer
+      expect(result.owed[0].outstanding).toBe('2500.00');
+      expect(result.owed[0].repaid).toBe('2500.00');
+      expect(result.owed[0].progress).toBe(50);
+    });
+  });
+
   describe('assertAccountUsable', () => {
     it('rejects a record whose currency differs from the account', async () => {
       prisma.financeAccount.findFirst.mockResolvedValue(account());

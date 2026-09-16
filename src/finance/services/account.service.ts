@@ -839,29 +839,92 @@ export class AccountService {
       orderBy: [{ dueDate: 'asc' }, { name: 'asc' }],
     });
 
+    const owed: DebtSummaryItem[] = [];
+    const lent: DebtSummaryItem[] = [];
+
+    if (accounts.length === 0) {
+      return new DebtsResponse({
+        owed,
+        lent,
+        totalOwed: ZERO.toFixed(2),
+        totalLent: ZERO.toFixed(2),
+        baseCurrency,
+      });
+    }
+
     const native = await this.computeNativeBalances(userId, accounts, asOf);
     const converter = this.makeConverter(userId, baseCurrency, asOf);
 
-    const owed: DebtSummaryItem[] = [];
-    const lent: DebtSummaryItem[] = [];
     let totalOwed = ZERO;
     let totalLent = ZERO;
 
-    // Repayments are transfers into a loan account (or out of a receivable).
-    const repayments = await this.prisma.currencyConversion.groupBy({
-      by: ['toAccountId'],
-      where: {
-        userId,
-        toAccountId: { in: accounts.map((a) => a.id) },
-        operationDate: { lte: asOf },
-      },
-      _sum: { toAmount: true },
-    });
-    const repaidById = new Map(
-      repayments
-        .filter((r) => r.toAccountId)
-        .map((r) => [r.toAccountId as string, r._sum.toAmount ?? ZERO]),
-    );
+    /**
+     * A repayment moves money *into* a loan but *out of* a receivable, so the
+     * two run off opposite legs of the transfer. Querying only one direction
+     * left every receivable reporting nothing repaid.
+     */
+    const receivableIds = accounts
+      .filter((a) => !AccountService.isLiability(a.kind))
+      .map((a) => a.id);
+    const liabilityIds = accounts
+      .filter((a) => AccountService.isLiability(a.kind))
+      .map((a) => a.id);
+
+    const [paidBackToYou, paidIntoDebt, recordSums] = await Promise.all([
+      this.prisma.currencyConversion.groupBy({
+        by: ['fromAccountId'],
+        where: {
+          userId,
+          fromAccountId: { in: receivableIds },
+          operationDate: { lte: asOf },
+        },
+        _sum: { fromAmount: true },
+      }),
+      this.prisma.currencyConversion.groupBy({
+        by: ['toAccountId'],
+        where: {
+          userId,
+          toAccountId: { in: liabilityIds },
+          operationDate: { lte: asOf },
+        },
+        _sum: { toAmount: true },
+      }),
+      /**
+       * A tracked balance is opening balance plus every record *and* transfer,
+       * so a repayment booked as a record already moves `outstanding`. Counting
+       * only transfers here left progress at 0% while the debt visibly shrank.
+       */
+      this.prisma.financeRecord.groupBy({
+        by: ['accountId', 'type'],
+        where: {
+          userId,
+          accountId: { in: accounts.map((a) => a.id) },
+          operationDate: { lte: asOf },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const repaidById = new Map<string, Prisma.Decimal>();
+    const addRepaid = (id: string, amount: Prisma.Decimal) =>
+      repaidById.set(id, (repaidById.get(id) ?? ZERO).add(amount));
+
+    for (const row of paidBackToYou) {
+      if (row.fromAccountId)
+        addRepaid(row.fromAccountId, row._sum.fromAmount ?? ZERO);
+    }
+    for (const row of paidIntoDebt) {
+      if (row.toAccountId)
+        addRepaid(row.toAccountId, row._sum.toAmount ?? ZERO);
+    }
+    for (const row of recordSums) {
+      if (!row.accountId) continue;
+      // Money owed shrinks on income; money lent out shrinks on expense.
+      const repaying = liabilityIds.includes(row.accountId)
+        ? row.type === 'INCOME'
+        : row.type === 'EXPENSE';
+      if (repaying) addRepaid(row.accountId, row._sum.amount ?? ZERO);
+    }
 
     for (const account of accounts) {
       const balance = native.get(account.id) ?? ZERO;
