@@ -8,21 +8,23 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  roles     Role[]
-  provider  Provider?
-  isBlocked Boolean   @default(false) @map("is_blocked")
-  isVerified Boolean  @default(false) @map("is_verified")
-  Token     Token[]
+  id            String          @id @default(uuid())
+  email         String          @unique
+  password      String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  roles         Role[]
+  provider      Provider?
+  isBlocked     Boolean         @default(false) @map("is_blocked")
+  isVerified    Boolean         @default(false) @map("is_verified")
+  Token         Token[]
   PasswordReset PasswordReset[]
-  EmailOtp  EmailOtp[]
+  EmailOtp      EmailOtp[]
 
   todos               Todo[]
   financeArticles     FinanceArticle[]
+  financeAccounts     FinanceAccount[]
+  financeValuations   FinanceAccountValuation[]
   financeRecords      FinanceRecord[]
   currencyConversions CurrencyConversion[]
   currencyRates       CurrencyRate[]
@@ -45,27 +47,27 @@ model Token {
 }
 
 model PasswordReset {
-  id        String   @id @default(uuid())
-  token     String   @unique
+  id        String    @id @default(uuid())
+  token     String    @unique
   exp       DateTime
-  used      Boolean  @default(false)
+  used      Boolean   @default(false)
   usedAt    DateTime?
   userId    String
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_resets")
 }
 
 model EmailOtp {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   code      String
   exp       DateTime
-  used      Boolean  @default(false)
+  used      Boolean   @default(false)
   usedAt    DateTime?
   userId    String
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, used, exp])
   @@map("email_otps")
@@ -89,6 +91,28 @@ enum FinanceArticleKind {
 enum FinanceRecordType {
   EXPENSE
   INCOME
+}
+
+enum FinanceAccountKind {
+  CASH
+  BANK
+  CARD
+  EWALLET
+  CRYPTO
+  SAVINGS
+  INVESTMENT
+  PROPERTY
+  RECEIVABLE
+  LOAN
+  CREDIT_CARD
+  OTHER
+}
+
+/// TRACKED  - balance is derived from opening balance + records + transfers.
+/// VALUED   - balance is the latest manual valuation (property, market-priced assets).
+enum FinanceAccountValuationMode {
+  TRACKED
+  VALUED
 }
 
 model Todo {
@@ -128,9 +152,10 @@ model FinanceRecord {
   id            String            @id @default(uuid())
   userId        String            @map("user_id")
   type          FinanceRecordType
-  amount        Decimal           @db.Decimal(18, 4)
-  currency      String            @db.VarChar(3)
+  amount        Decimal           @db.Decimal(28, 8)
+  currency      String            @db.VarChar(10)
   articleId     String?           @map("article_id")
+  accountId     String?           @map("account_id")
   remark        String?
   operationDate DateTime          @map("operation_date")
   createdAt     DateTime          @default(now()) @map("created_at")
@@ -138,19 +163,21 @@ model FinanceRecord {
 
   user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   article FinanceArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  account FinanceAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
   @@index([userId, operationDate])
   @@index([userId, type])
   @@index([articleId])
+  @@index([accountId, operationDate])
   @@map("finance_records")
 }
 
 model CurrencyRate {
   id            String   @id @default(uuid())
   userId        String   @map("user_id")
-  baseCurrency  String   @map("base_currency") @db.VarChar(3)
-  quoteCurrency String   @map("quote_currency") @db.VarChar(3)
-  rate          Decimal  @db.Decimal(18, 8)
+  baseCurrency  String   @map("base_currency") @db.VarChar(10)
+  quoteCurrency String   @map("quote_currency") @db.VarChar(10)
+  rate          Decimal  @db.Decimal(38, 18)
   source        String?
   effectiveAt   DateTime @map("effective_at")
   createdAt     DateTime @default(now()) @map("created_at")
@@ -166,23 +193,87 @@ model CurrencyRate {
 model CurrencyConversion {
   id            String   @id @default(uuid())
   userId        String   @map("user_id")
-  fromAmount    Decimal  @map("from_amount") @db.Decimal(18, 4)
-  fromCurrency  String   @map("from_currency") @db.VarChar(3)
-  toAmount      Decimal  @map("to_amount") @db.Decimal(18, 4)
-  toCurrency    String   @map("to_currency") @db.VarChar(3)
-  rateUsed      Decimal  @map("rate_used") @db.Decimal(18, 8)
+  fromAmount    Decimal  @map("from_amount") @db.Decimal(28, 8)
+  fromCurrency  String   @map("from_currency") @db.VarChar(10)
+  toAmount      Decimal  @map("to_amount") @db.Decimal(28, 8)
+  toCurrency    String   @map("to_currency") @db.VarChar(10)
+  rateUsed      Decimal  @map("rate_used") @db.Decimal(38, 18)
   rateId        String?  @map("rate_id")
-  feeAmount     Decimal? @map("fee_amount") @db.Decimal(18, 4)
-  feeCurrency   String?  @map("fee_currency") @db.VarChar(3)
+  fromAccountId String?  @map("from_account_id")
+  toAccountId   String?  @map("to_account_id")
+  feeAmount     Decimal? @map("fee_amount") @db.Decimal(28, 8)
+  feeCurrency   String?  @map("fee_currency") @db.VarChar(10)
   remark        String?
   operationDate DateTime @map("operation_date")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rate CurrencyRate? @relation(fields: [rateId], references: [id], onDelete: SetNull)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rate        CurrencyRate?   @relation(fields: [rateId], references: [id], onDelete: SetNull)
+  fromAccount FinanceAccount? @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: SetNull)
+  toAccount   FinanceAccount? @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: SetNull)
 
   @@index([userId, operationDate])
   @@index([fromCurrency, toCurrency])
+  @@index([fromAccountId, operationDate])
+  @@index([toAccountId, operationDate])
   @@map("currency_conversions")
+}
+
+model FinanceAccount {
+  id            String                      @id @default(uuid())
+  userId        String                      @map("user_id")
+  name          String
+  kind          FinanceAccountKind
+  valuationMode FinanceAccountValuationMode @default(TRACKED)
+  currency      String                      @db.VarChar(10)
+
+  /// Balance the account already held before any record in this app.
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(28, 8)
+  openingDate    DateTime @map("opening_date")
+
+  institution String?
+  color       String?
+  icon        String?
+
+  /// Debt / loan bookkeeping. Only meaningful for LOAN, CREDIT_CARD, RECEIVABLE.
+  counterparty String?   @map("counterparty")
+  creditLimit  Decimal?  @map("credit_limit") @db.Decimal(28, 8)
+  interestRate Decimal?  @map("interest_rate") @db.Decimal(9, 4)
+  dueDate      DateTime? @map("due_date")
+
+  isArchived          Boolean @default(false) @map("is_archived")
+  excludeFromNetWorth Boolean @default(false) @map("exclude_from_net_worth")
+  sortOrder           Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records       FinanceRecord[]
+  valuations    FinanceAccountValuation[]
+  transfersFrom CurrencyConversion[]      @relation("TransferFrom")
+  transfersTo   CurrencyConversion[]      @relation("TransferTo")
+
+  @@unique([userId, name], map: "finance_accounts_user_name_unique")
+  @@index([userId, kind])
+  @@index([userId, isArchived])
+  @@map("finance_accounts")
+}
+
+model FinanceAccountValuation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  accountId String   @map("account_id")
+  value     Decimal  @db.Decimal(28, 8)
+  remark    String?
+  valuedAt  DateTime @map("valued_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account FinanceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, valuedAt])
+  @@index([userId, valuedAt])
+  @@map("finance_account_valuations")
 }

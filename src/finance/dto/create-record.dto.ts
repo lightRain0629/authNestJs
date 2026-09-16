@@ -27,22 +27,23 @@ export class CreateRecordDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d+(\.\d{1,4})?$/, {
+  @Matches(/^\d+(\.\d{1,8})?$/, {
     message:
-      'Amount must be a positive decimal string with up to 4 decimal places',
+      'Amount must be a positive decimal string with up to 8 decimal places',
   })
   amount: string;
 
   @ApiProperty({
-    description: 'Currency ISO code (3 letters, uppercase)',
+    description: 'Currency or asset ticker (USD, TMT, BTC, USDT)',
     example: 'USD',
-    maxLength: 3,
-    minLength: 3,
+    maxLength: 10,
+    minLength: 2,
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   currency: string;
 
@@ -53,6 +54,16 @@ export class CreateRecordDto {
   @IsUUID()
   @IsOptional()
   articleId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Account this money moves through. Must match the account currency. ' +
+      'Omit to leave the record unassigned (counts in reports, not in balances).',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  accountId?: string;
 
   @ApiPropertyOptional({
     description: 'Optional remark/note',

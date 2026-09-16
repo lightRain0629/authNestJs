@@ -7,12 +7,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateConversionDto, ListConversionsDto } from '../dto';
 import { CurrencyConversion, Prisma } from '@prisma/client';
 import { RateService } from './rate.service';
+import { AccountService } from './account.service';
 
 @Injectable()
 export class ConversionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rateService: RateService,
+    private readonly accountService: AccountService,
   ) {}
 
   async create(
@@ -22,6 +24,53 @@ export class ConversionService {
     const fromCurrency = dto.fromCurrency.toUpperCase();
     const toCurrency = dto.toCurrency.toUpperCase();
     const operationDate = new Date(dto.operationDate);
+
+    if (dto.fromAccountId) {
+      await this.accountService.assertAccountUsable(
+        dto.fromAccountId,
+        userId,
+        fromCurrency,
+      );
+    }
+    if (dto.toAccountId) {
+      await this.accountService.assertAccountUsable(
+        dto.toAccountId,
+        userId,
+        toCurrency,
+      );
+    }
+    if (
+      dto.fromAccountId &&
+      dto.toAccountId &&
+      dto.fromAccountId === dto.toAccountId
+    ) {
+      throw new UnprocessableEntityException(
+        'A transfer needs two different accounts',
+      );
+    }
+
+    const fromAmount = new Prisma.Decimal(dto.fromAmount);
+
+    // Moving money between accounts of the same currency needs no FX rate at all.
+    if (fromCurrency === toCurrency) {
+      return this.prisma.currencyConversion.create({
+        data: {
+          userId,
+          fromAmount,
+          fromCurrency,
+          toAmount: fromAmount,
+          toCurrency,
+          rateUsed: new Prisma.Decimal(1),
+          rateId: null,
+          fromAccountId: dto.fromAccountId ?? null,
+          toAccountId: dto.toAccountId ?? null,
+          feeAmount: dto.feeAmount ? new Prisma.Decimal(dto.feeAmount) : null,
+          feeCurrency: dto.feeCurrency?.toUpperCase() ?? null,
+          remark: dto.remark ?? null,
+          operationDate,
+        },
+      });
+    }
 
     let rateLookup;
     try {
@@ -40,7 +89,6 @@ export class ConversionService {
       throw error;
     }
 
-    const fromAmount = new Prisma.Decimal(dto.fromAmount);
     const toAmount = fromAmount.mul(rateLookup.effectiveRate);
 
     return this.prisma.currencyConversion.create({
@@ -52,6 +100,8 @@ export class ConversionService {
         toCurrency,
         rateUsed: rateLookup.effectiveRate,
         rateId: rateLookup.rate.id,
+        fromAccountId: dto.fromAccountId ?? null,
+        toAccountId: dto.toAccountId ?? null,
         feeAmount: dto.feeAmount ? new Prisma.Decimal(dto.feeAmount) : null,
         feeCurrency: dto.feeCurrency?.toUpperCase() ?? null,
         remark: dto.remark ?? null,

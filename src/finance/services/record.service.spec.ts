@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RecordService } from './record.service';
 import { ArticleService } from './article.service';
+import { AccountService } from './account.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   FinanceRecord,
@@ -47,6 +48,10 @@ describe('RecordService', () => {
         RecordService,
         { provide: PrismaService, useValue: prisma },
         { provide: ArticleService, useValue: articleService },
+        {
+          provide: AccountService,
+          useValue: { assertAccountUsable: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -66,6 +71,7 @@ describe('RecordService', () => {
         amount: new Prisma.Decimal('100.00'),
         currency: 'USD',
         articleId: null,
+        accountId: null,
         remark: 'Test expense',
         operationDate: new Date('2024-01-15'),
         createdAt: new Date(),
@@ -108,6 +114,7 @@ describe('RecordService', () => {
         amount: new Prisma.Decimal('50.00'),
         currency: 'EUR',
         articleId: 'art-1',
+        accountId: null,
         remark: null,
         operationDate: new Date('2024-01-15'),
         createdAt: new Date(),
@@ -123,6 +130,7 @@ describe('RecordService', () => {
         amount: '50.00',
         currency: 'EUR',
         articleId: 'art-1',
+        accountId: null,
         operationDate: '2024-01-15T00:00:00Z',
       });
 
@@ -147,6 +155,7 @@ describe('RecordService', () => {
           amount: '50.00',
           currency: 'EUR',
           articleId: 'income-article-id',
+          accountId: null,
           operationDate: '2024-01-15T00:00:00Z',
         }),
       ).rejects.toThrow(BadRequestException);
@@ -160,6 +169,7 @@ describe('RecordService', () => {
         amount: new Prisma.Decimal('200.00'),
         currency: 'EUR',
         articleId: null,
+        accountId: null,
         remark: null,
         operationDate: new Date('2024-01-15'),
         createdAt: new Date(),
@@ -195,6 +205,7 @@ describe('RecordService', () => {
         amount: new Prisma.Decimal('100.00'),
         currency: 'USD',
         articleId: null,
+        accountId: null,
         remark: null,
         operationDate: new Date('2024-01-15'),
         createdAt: new Date(),
@@ -232,6 +243,7 @@ describe('RecordService', () => {
           amount: new Prisma.Decimal('100.00'),
           currency: 'USD',
           articleId: null,
+          accountId: null,
           remark: null,
           operationDate: new Date('2024-01-15'),
           createdAt: new Date(),
@@ -258,6 +270,39 @@ describe('RecordService', () => {
       await expect(
         service.findOne('someone-elses-record', userId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('parseAmountQuery', () => {
+    const parse = (q: string) => RecordService.parseAmountQuery(q);
+    const val = (d: unknown) => (d as Prisma.Decimal).toString();
+
+    it('matches an exact amount', () => {
+      expect(val(parse('1200')!.equals)).toBe('1200');
+      expect(val(parse('10.50')!.equals)).toBe('10.5');
+    });
+
+    it('understands comparisons', () => {
+      expect(val(parse('>500')!.gt)).toBe('500');
+      expect(val(parse('>= 500')!.gte)).toBe('500');
+      expect(val(parse('<10.5')!.lt)).toBe('10.5');
+      expect(val(parse('<=10')!.lte)).toBe('10');
+    });
+
+    it('understands a range and normalises a reversed one', () => {
+      const range = parse('100-250')!;
+      expect(val(range.gte)).toBe('100');
+      expect(val(range.lte)).toBe('250');
+
+      const reversed = parse('250-100')!;
+      expect(val(reversed.gte)).toBe('100');
+      expect(val(reversed.lte)).toBe('250');
+    });
+
+    it('ignores text that is not an amount', () => {
+      expect(parse('groceries')).toBeNull();
+      expect(parse('')).toBeNull();
+      expect(parse('12abc')).toBeNull();
     });
   });
 });

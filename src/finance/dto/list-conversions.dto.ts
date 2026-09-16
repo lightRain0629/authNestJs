@@ -17,8 +17,9 @@ export class ListConversionsDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   fromCurrency?: string;
 
@@ -28,8 +29,9 @@ export class ListConversionsDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   toCurrency?: string;
 

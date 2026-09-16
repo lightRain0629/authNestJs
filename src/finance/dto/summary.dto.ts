@@ -30,8 +30,9 @@ export class SummaryDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   baseCurrency?: string;
 }
@@ -60,8 +61,9 @@ export class ChartQueryDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   baseCurrency?: string;
 }

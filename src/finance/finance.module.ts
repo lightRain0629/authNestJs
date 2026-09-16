@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
+  AccountController,
   ArticleController,
   RecordController,
   RateController,
@@ -7,6 +8,7 @@ import {
   SummaryController,
 } from './controllers';
 import {
+  AccountService,
   ArticleService,
   RecordService,
   RateService,
@@ -16,6 +18,7 @@ import {
 
 @Module({
   controllers: [
+    AccountController,
     ArticleController,
     RecordController,
     RateController,
@@ -23,6 +26,7 @@ import {
     SummaryController,
   ],
   providers: [
+    AccountService,
     ArticleService,
     RecordService,
     RateService,
@@ -30,6 +34,7 @@ import {
     SummaryService,
   ],
   exports: [
+    AccountService,
     ArticleService,
     RecordService,
     RateService,

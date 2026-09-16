@@ -14,8 +14,9 @@ export class LatestRateDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Base currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Base currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   base: string;
 
@@ -25,8 +26,9 @@ export class LatestRateDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Quote currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Quote currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   quote: string;
 

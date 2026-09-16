@@ -9,6 +9,13 @@ type RecordWithArticle = FinanceRecord & {
     kind: string;
     color: string | null;
   } | null;
+  account?: {
+    id: string;
+    name: string;
+    kind: string;
+    currency: string;
+    color: string | null;
+  } | null;
 };
 
 export class RecordResponse {
@@ -43,11 +50,23 @@ export class RecordResponse {
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt: Date;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  accountId: string | null;
+
   @ApiPropertyOptional({ description: 'Article details if included' })
   article?: {
     id: string;
     name: string;
     kind: string;
+    color: string | null;
+  } | null;
+
+  @ApiPropertyOptional({ description: 'Account details if included' })
+  account?: {
+    id: string;
+    name: string;
+    kind: string;
+    currency: string;
     color: string | null;
   } | null;
 
@@ -61,10 +80,12 @@ export class RecordResponse {
         : String(record.amount);
     this.currency = record.currency;
     this.articleId = record.articleId;
+    this.accountId = record.accountId;
     this.remark = record.remark;
     this.operationDate = record.operationDate;
     this.createdAt = record.createdAt;
     this.updatedAt = record.updatedAt;
     this.article = record.article ?? null;
+    this.account = record.account ?? null;
   }
 }

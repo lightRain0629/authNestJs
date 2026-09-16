@@ -1,9 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ChartQueryDto, SummaryDto } from '../dto';
+import {
+  CashflowDto,
+  CashflowInterval,
+  ChartQueryDto,
+  SummaryDto,
+} from '../dto';
 import { FinanceRecordType, Prisma } from '@prisma/client';
 import { RateService } from './rate.service';
-import { ChartResponse, SummaryResponse } from '../responses';
+import {
+  CashflowPoint,
+  CashflowResponse,
+  ChartResponse,
+  FlowLeg,
+  MissingRate,
+  SummaryResponse,
+} from '../responses';
 
 @Injectable()
 export class SummaryService {
@@ -254,6 +266,223 @@ export class SummaryService {
     }
 
     return new ChartResponse({ items, total });
+  }
+
+  /**
+   * The money-flow view: income and expense per period, plus where the money
+   * came from and where it went, all in one currency so the sides compare.
+   */
+  async getCashflow(
+    userId: string,
+    query: CashflowDto,
+  ): Promise<CashflowResponse> {
+    const fromDate = new Date(query.from);
+    const toDate = new Date(query.to);
+    const interval = query.interval ?? 'month';
+    const baseCurrency = query.baseCurrency?.toUpperCase() ?? 'USD';
+
+    const missing = new Map<string, MissingRate>();
+    const rateCache = new Map<string, Prisma.Decimal | null>();
+
+    const convert = async (
+      amount: Prisma.Decimal,
+      currency: string,
+    ): Promise<Prisma.Decimal | null> => {
+      if (currency === baseCurrency) return amount;
+      const key = currency;
+      if (!rateCache.has(key)) {
+        try {
+          const lookup = await this.rateService.findRateForDate(
+            userId,
+            currency,
+            baseCurrency,
+            toDate,
+          );
+          rateCache.set(key, new Prisma.Decimal(lookup.effectiveRate));
+        } catch {
+          rateCache.set(key, null);
+          missing.set(key, { from: currency, to: baseCurrency });
+        }
+      }
+      const rate = rateCache.get(key) ?? null;
+      return rate === null ? null : amount.mul(rate);
+    };
+
+    const records = await this.prisma.financeRecord.findMany({
+      where: {
+        userId,
+        operationDate: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        type: true,
+        amount: true,
+        currency: true,
+        operationDate: true,
+        article: { select: { id: true, name: true, color: true } },
+        account: { select: { id: true, name: true, color: true, kind: true } },
+      },
+    });
+
+    const buckets = new Map<
+      string,
+      { date: Date; income: Prisma.Decimal; expense: Prisma.Decimal }
+    >();
+    const incomeByCategory = new Map<
+      string,
+      FlowLeg & { raw: Prisma.Decimal }
+    >();
+    const expenseByCategory = new Map<
+      string,
+      FlowLeg & { raw: Prisma.Decimal }
+    >();
+    const expenseByAccount = new Map<
+      string,
+      FlowLeg & { raw: Prisma.Decimal }
+    >();
+
+    let totalIncome = new Prisma.Decimal(0);
+    let totalExpense = new Prisma.Decimal(0);
+
+    const bump = (
+      map: Map<string, FlowLeg & { raw: Prisma.Decimal }>,
+      id: string | null,
+      name: string,
+      color: string,
+      amount: Prisma.Decimal,
+    ) => {
+      const key = id ?? `~${name}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.raw = existing.raw.add(amount);
+      } else {
+        map.set(key, {
+          id,
+          name,
+          color,
+          raw: amount,
+          total: '0',
+          percentage: 0,
+        });
+      }
+    };
+
+    for (const record of records) {
+      const converted = await convert(record.amount, record.currency);
+      if (converted === null) continue;
+
+      const bucketKey = this.bucketKey(record.operationDate, interval);
+      const bucket = buckets.get(bucketKey) ?? {
+        date: this.bucketStart(record.operationDate, interval),
+        income: new Prisma.Decimal(0),
+        expense: new Prisma.Decimal(0),
+      };
+
+      if (record.type === 'INCOME') {
+        bucket.income = bucket.income.add(converted);
+        totalIncome = totalIncome.add(converted);
+        bump(
+          incomeByCategory,
+          record.article?.id ?? null,
+          record.article?.name ?? 'Uncategorized',
+          record.article?.color ?? '#64748B',
+          converted,
+        );
+      } else {
+        bucket.expense = bucket.expense.add(converted);
+        totalExpense = totalExpense.add(converted);
+        bump(
+          expenseByCategory,
+          record.article?.id ?? null,
+          record.article?.name ?? 'Uncategorized',
+          record.article?.color ?? '#64748B',
+          converted,
+        );
+        bump(
+          expenseByAccount,
+          record.account?.id ?? null,
+          record.account?.name ?? 'Unassigned',
+          record.account?.color ?? '#64748B',
+          converted,
+        );
+      }
+
+      buckets.set(bucketKey, bucket);
+    }
+
+    const points: CashflowPoint[] = Array.from(buckets.values())
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map((bucket) => ({
+        date: bucket.date.toISOString(),
+        label: this.bucketLabel(bucket.date, interval),
+        income: bucket.income.toFixed(2),
+        expense: bucket.expense.toFixed(2),
+        net: bucket.income.sub(bucket.expense).toFixed(2),
+      }));
+
+    const finalize = (
+      map: Map<string, FlowLeg & { raw: Prisma.Decimal }>,
+      total: Prisma.Decimal,
+    ): FlowLeg[] =>
+      Array.from(map.values())
+        .map(({ raw, ...leg }) => ({
+          ...leg,
+          total: raw.toFixed(2),
+          percentage: total.isZero()
+            ? 0
+            : parseFloat(raw.mul(100).div(total).toFixed(2)),
+        }))
+        .sort((a, b) => parseFloat(b.total) - parseFloat(a.total));
+
+    const netFlow = totalIncome.sub(totalExpense);
+
+    return new CashflowResponse({
+      points,
+      baseCurrency,
+      totalIncome: totalIncome.toFixed(2),
+      totalExpense: totalExpense.toFixed(2),
+      netFlow: netFlow.toFixed(2),
+      savingsRate: totalIncome.isZero()
+        ? null
+        : parseFloat(netFlow.mul(100).div(totalIncome).toFixed(2)),
+      averageExpense:
+        points.length === 0
+          ? '0.00'
+          : totalExpense.div(points.length).toFixed(2),
+      incomeByCategory: finalize(incomeByCategory, totalIncome),
+      expenseByCategory: finalize(expenseByCategory, totalExpense),
+      expenseByAccount: finalize(expenseByAccount, totalExpense),
+      missingRates: Array.from(missing.values()),
+    });
+  }
+
+  private bucketStart(date: Date, interval: CashflowInterval): Date {
+    if (interval === 'day') {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+    if (interval === 'week') {
+      const start = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+      );
+      start.setDate(start.getDate() - start.getDay());
+      return start;
+    }
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+
+  private bucketKey(date: Date, interval: CashflowInterval): string {
+    return this.bucketStart(date, interval).toISOString();
+  }
+
+  private bucketLabel(date: Date, interval: CashflowInterval): string {
+    if (interval === 'month') {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        year: '2-digit',
+      });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   private async convertToBase(

@@ -109,6 +109,70 @@ export class RateService {
     );
   }
 
+  /**
+   * Like findRateForDate, but for dates earlier than the first rate on file it
+   * falls back to the earliest rate that exists. Reporting a historical balance
+   * at a slightly-off rate beats dropping the account out of the chart; booking
+   * a real conversion still uses the strict lookup.
+   */
+  async findNearestRateForDate(
+    userId: string,
+    fromCurrency: string,
+    toCurrency: string,
+    targetDate: Date,
+  ): Promise<RateLookupResult> {
+    try {
+      return await this.findRateForDate(
+        userId,
+        fromCurrency,
+        toCurrency,
+        targetDate,
+      );
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) throw error;
+    }
+
+    const earliestDirect = await this.prisma.currencyRate.findFirst({
+      where: {
+        userId,
+        baseCurrency: fromCurrency,
+        quoteCurrency: toCurrency,
+        effectiveAt: { gt: targetDate },
+      },
+      orderBy: { effectiveAt: 'asc' },
+    });
+
+    if (earliestDirect) {
+      return {
+        rate: earliestDirect,
+        effectiveRate: earliestDirect.rate,
+        isInverse: false,
+      };
+    }
+
+    const earliestInverse = await this.prisma.currencyRate.findFirst({
+      where: {
+        userId,
+        baseCurrency: toCurrency,
+        quoteCurrency: fromCurrency,
+        effectiveAt: { gt: targetDate },
+      },
+      orderBy: { effectiveAt: 'asc' },
+    });
+
+    if (earliestInverse) {
+      return {
+        rate: earliestInverse,
+        effectiveRate: new Prisma.Decimal(1).div(earliestInverse.rate),
+        isInverse: true,
+      };
+    }
+
+    throw new NotFoundException(
+      `No FX rate found for ${fromCurrency}/${toCurrency} at ${targetDate.toISOString()}`,
+    );
+  }
+
   async findById(id: string, userId: string): Promise<CurrencyRate> {
     const rate = await this.prisma.currencyRate.findFirst({
       where: { id, userId },

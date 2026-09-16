@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConversionService } from './conversion.service';
 import { RateService } from './rate.service';
+import { AccountService } from './account.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrencyConversion, CurrencyRate, Prisma } from '@prisma/client';
 
@@ -23,16 +24,22 @@ const mockRateService = () => ({
   findRateForDate: jest.fn(),
 });
 
+const mockAccountService = () => ({
+  assertAccountUsable: jest.fn(),
+});
+
 describe('ConversionService', () => {
   let service: ConversionService;
   let prisma: ReturnType<typeof mockPrisma>;
   let rateService: ReturnType<typeof mockRateService>;
+  let accountService: ReturnType<typeof mockAccountService>;
 
   const userId = 'user-123';
 
   beforeEach(async () => {
     prisma = mockPrisma();
     rateService = mockRateService();
+    accountService = mockAccountService();
     prisma.$transaction.mockImplementation(
       async (actions: Promise<unknown>[]) => Promise.all(actions),
     );
@@ -42,6 +49,7 @@ describe('ConversionService', () => {
         ConversionService,
         { provide: PrismaService, useValue: prisma },
         { provide: RateService, useValue: rateService },
+        { provide: AccountService, useValue: accountService },
       ],
     }).compile();
 
@@ -85,6 +93,8 @@ describe('ConversionService', () => {
         toCurrency: 'EUR',
         rateUsed: new Prisma.Decimal('0.92'),
         rateId: 'rate-1',
+        fromAccountId: null,
+        toAccountId: null,
         feeAmount: null,
         feeCurrency: null,
         remark: null,
@@ -139,6 +149,8 @@ describe('ConversionService', () => {
         toCurrency: 'TMT',
         rateUsed: new Prisma.Decimal('3.5'),
         rateId: 'rate-1',
+        fromAccountId: null,
+        toAccountId: null,
         feeAmount: new Prisma.Decimal('5'),
         feeCurrency: 'USD',
         remark: 'Exchange at bank',
@@ -210,6 +222,8 @@ describe('ConversionService', () => {
         toCurrency: 'EUR',
         rateUsed: inverseEffectiveRate,
         rateId: 'rate-2',
+        fromAccountId: null,
+        toAccountId: null,
         feeAmount: null,
         feeCurrency: null,
         remark: null,

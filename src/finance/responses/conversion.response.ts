@@ -27,6 +27,12 @@ export class ConversionResponse {
   @ApiPropertyOptional({ format: 'uuid' })
   rateId: string | null;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  fromAccountId: string | null;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  toAccountId: string | null;
+
   @ApiPropertyOptional({ description: 'Fee amount as string decimal' })
   feeAmount: string | null;
 
@@ -63,6 +69,8 @@ export class ConversionResponse {
         ? conversion.rateUsed.toString()
         : String(conversion.rateUsed);
     this.rateId = conversion.rateId;
+    this.fromAccountId = conversion.fromAccountId;
+    this.toAccountId = conversion.toAccountId;
     this.feeAmount =
       conversion.feeAmount instanceof Prisma.Decimal
         ? conversion.feeAmount.toString()

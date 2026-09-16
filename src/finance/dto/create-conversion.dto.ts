@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
 } from 'class-validator';
@@ -15,9 +16,9 @@ export class CreateConversionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d+(\.\d{1,4})?$/, {
+  @Matches(/^\d+(\.\d{1,8})?$/, {
     message:
-      'Amount must be a positive decimal string with up to 4 decimal places',
+      'Amount must be a positive decimal string with up to 8 decimal places',
   })
   fromAmount: string;
 
@@ -27,8 +28,9 @@ export class CreateConversionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   fromCurrency: string;
 
@@ -38,8 +40,9 @@ export class CreateConversionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   toCurrency: string;
 
@@ -52,14 +55,32 @@ export class CreateConversionDto {
   operationDate: string;
 
   @ApiPropertyOptional({
+    description:
+      'Account the money leaves. Its currency must equal fromCurrency.',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  fromAccountId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Account the money lands in. Its currency must equal toCurrency.',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  toAccountId?: string;
+
+  @ApiPropertyOptional({
     description: 'Fee amount (as string decimal)',
     example: '5.00',
   })
   @IsString()
   @IsOptional()
-  @Matches(/^\d+(\.\d{1,4})?$/, {
+  @Matches(/^\d+(\.\d{1,8})?$/, {
     message:
-      'Fee amount must be a positive decimal string with up to 4 decimal places',
+      'Fee amount must be a positive decimal string with up to 8 decimal places',
   })
   feeAmount?: string;
 
@@ -69,8 +90,9 @@ export class CreateConversionDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   feeCurrency?: string;
 

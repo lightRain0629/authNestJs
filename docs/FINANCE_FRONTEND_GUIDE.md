@@ -978,3 +978,110 @@ export const QuickRecordForm: React.FC<Props> = ({ type, onSuccess }) => {
 6. **Rate Lookup**: When creating conversions, the API automatically finds the appropriate rate. If no rate exists, it returns 422.
 
 7. **User Scoping**: All data is automatically scoped to the authenticated user. Users cannot access other users' data.
+
+---
+
+## Accounts, Net Worth & Money Flow
+
+Added alongside the original module. Records and conversions keep working
+unchanged — `accountId` is optional everywhere, so existing data stays valid.
+
+### Concepts
+
+An **account** is a place money sits: cash, a bank card, a crypto wallet, a
+property, or a debt. Two balance sources:
+
+| `valuationMode` | Balance is | Use for |
+|---|---|---|
+| `TRACKED` | `openingBalance` + income − expense ± transfers | cash, bank, card, e-wallet, crypto held as a ledger |
+| `VALUED` | the latest `FinanceAccountValuation` | property, investments, anything priced by a market |
+
+`openingBalance` is the escape hatch for existing data: set it to what the
+account holds today instead of back-filling years of records.
+
+**Debts are accounts.** A `LOAN` or `CREDIT_CARD` account carries a negative
+balance and is reported as a positive `totalLiabilities`. Borrowing is a
+transfer out of the loan account; repaying is a transfer into it. `RECEIVABLE`
+is the mirror — money you lent out, counted as an asset.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/finance/accounts` | Create an account |
+| `GET` | `/finance/accounts` | List (`kind`, `includeArchived`) |
+| `GET` | `/finance/accounts/balances` | Every balance + net worth in one call |
+| `GET` | `/finance/accounts/net-worth/history` | Time series for charting |
+| `GET` | `/finance/accounts/debts` | Owed / lent, with repayment progress |
+| `GET` | `/finance/accounts/:id` | Single account |
+| `PATCH` | `/finance/accounts/:id` | Update (currency is immutable) |
+| `DELETE` | `/finance/accounts/:id` | Deletes if unused, archives if it has history |
+| `POST` | `/finance/accounts/:id/valuations` | Record a new value (VALUED only) |
+| `GET` | `/finance/accounts/:id/valuations` | Valuation history |
+| `DELETE` | `/finance/accounts/:id/valuations/:valuationId` | Remove a valuation |
+| `GET` | `/finance/summary/cashflow` | Income/expense per period + flow breakdown |
+
+`GET /finance/accounts/balances` query: `asOf`, `baseCurrency`,
+`includeArchived`. Returns `accounts[]`, `totalAssets`, `totalLiabilities`,
+`netWorth`, `byKind`, `byCurrency`, and **`missingRates`**.
+
+`GET /finance/accounts/net-worth/history` query: `from`, `to`,
+`interval` (`day|week|month`), `baseCurrency`. Capped at 400 points.
+
+`GET /finance/summary/cashflow` query: `from`, `to`, `interval`,
+`baseCurrency`. Returns `points[]`, `totalIncome`, `totalExpense`, `netFlow`,
+`savingsRate`, `averageExpense`, `incomeByCategory`, `expenseByCategory`,
+`expenseByAccount`, `missingRates`.
+
+### Rules the API enforces
+
+- A record's `currency` **must equal** its account's currency (422 otherwise) —
+  move money across currencies with a transfer, not a mismatched record.
+- Records cannot be attached to a `VALUED` account (422) — update its value.
+- A transfer's two legs must be different accounts (422).
+- **Same-currency transfers need no FX rate** — rate 1 is used and no lookup
+  happens, so "cash → bank" works with no rate data at all.
+- Transfer fees are deducted from the source account, and only when the fee
+  currency matches that account's currency.
+
+### `missingRates` — do not ignore it
+
+When no rate exists for a pair, the balance is **excluded** from the totals and
+the pair is listed in `missingRates`. It is never silently counted as zero.
+Surface it, or your users will see an understated net worth with no explanation.
+
+Net worth *history* is more forgiving: for dates before the earliest rate on
+file it falls back to the earliest rate that exists, so an account is never
+dropped out of the middle of a chart. Booking a real conversion still requires a
+strictly valid rate.
+
+### Currency / ticker format
+
+`currency` is now `VARCHAR(10)` matching `/^[A-Z0-9]{2,10}$/`, and amounts are
+`DECIMAL(28,8)`. `USDT`, `USDC` and 8-decimal `BTC` amounts all work.
+
+> `Intl.NumberFormat` with `style: "currency"` throws a `RangeError` on
+> non-ISO-4217 codes. Detect and fall back before formatting crypto tickers —
+> see `formatMoney` in `src/lib/finance-utils.ts`.
+
+### Record search by amount
+
+`GET /finance/records?search=` matches remark and category name as before, and
+additionally parses the query as an amount:
+
+| Query | Matches |
+|---|---|
+| `1200` | amount exactly 1200 |
+| `>500` / `>=500` | amount above (or at) 500 |
+| `<50` / `<=50` | amount below (or at) 50 |
+| `100-250` | amount between 100 and 250 (order-insensitive) |
+
+Non-numeric text falls through to the text search unchanged.
+
+### Migration notes
+
+`20260916000000_add_finance_accounts` is **additive only** — two new tables,
+nullable columns, and type widening. It contains no `DROP` or `TRUNCATE`, so it
+is safe against a populated production database. Verified by applying it to a
+database seeded with pre-existing records, rates and conversions: all values and
+row counts were preserved (only trailing zeros were added by the wider scale).

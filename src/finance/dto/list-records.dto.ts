@@ -28,8 +28,9 @@ export class ListRecordsDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(/^[A-Z]{3}$/, {
-    message: 'Currency must be a 3-letter ISO code in uppercase',
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
   })
   currency?: string;
 
@@ -40,6 +41,14 @@ export class ListRecordsDto {
   @IsUUID()
   @IsOptional()
   articleId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by account ID',
+    format: 'uuid',
+  })
+  @IsUUID()
+  @IsOptional()
+  accountId?: string;
 
   @ApiPropertyOptional({
     description: 'Filter from date (operationDate >= from)',
