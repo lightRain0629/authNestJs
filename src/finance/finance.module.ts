@@ -6,6 +6,7 @@ import {
   RateController,
   ConversionController,
   SummaryController,
+  PlanController,
 } from './controllers';
 import {
   AccountService,
@@ -14,6 +15,7 @@ import {
   RateService,
   ConversionService,
   SummaryService,
+  PlanService,
 } from './services';
 
 @Module({
@@ -24,6 +26,7 @@ import {
     RateController,
     ConversionController,
     SummaryController,
+    PlanController,
   ],
   providers: [
     AccountService,
@@ -32,6 +35,7 @@ import {
     RateService,
     ConversionService,
     SummaryService,
+    PlanService,
   ],
   exports: [
     AccountService,
@@ -40,6 +44,7 @@ import {
     RateService,
     ConversionService,
     SummaryService,
+    PlanService,
   ],
 })
 export class FinanceModule {}

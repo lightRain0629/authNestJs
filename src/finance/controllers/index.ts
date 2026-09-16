@@ -4,3 +4,4 @@ export * from './rate.controller';
 export * from './conversion.controller';
 export * from './summary.controller';
 export * from './account.controller';
+export * from './plan.controller';

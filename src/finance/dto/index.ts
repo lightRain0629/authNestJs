@@ -18,3 +18,7 @@ export * from './balances.dto';
 export * from './net-worth-history.dto';
 export * from './create-valuation.dto';
 export * from './cashflow.dto';
+export * from './create-plan.dto';
+export * from './update-plan.dto';
+export * from './list-plans.dto';
+export * from './plan-progress.dto';

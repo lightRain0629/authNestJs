@@ -28,6 +28,7 @@ model User {
   financeRecords      FinanceRecord[]
   currencyConversions CurrencyConversion[]
   currencyRates       CurrencyRate[]
+  financePlans        FinancePlan[]
 
   @@map("users")
 }
@@ -142,6 +143,7 @@ model FinanceArticle {
 
   user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   records FinanceRecord[]
+  plans   FinancePlan[]
 
   @@unique([userId, kind, name], map: "finance_articles_user_kind_name_unique")
   @@index([userId, kind])
@@ -254,6 +256,7 @@ model FinanceAccount {
   valuations    FinanceAccountValuation[]
   transfersFrom CurrencyConversion[]      @relation("TransferFrom")
   transfersTo   CurrencyConversion[]      @relation("TransferTo")
+  plans         FinancePlan[]
 
   @@unique([userId, name], map: "finance_accounts_user_name_unique")
   @@index([userId, kind])
@@ -276,4 +279,53 @@ model FinanceAccountValuation {
   @@index([accountId, valuedAt])
   @@index([userId, valuedAt])
   @@map("finance_account_valuations")
+}
+
+/// What a plan promises: a ceiling on spending, a pot to fill, or an amount to
+/// put aside each period.
+enum FinancePlanKind {
+  LIMIT
+  GOAL
+  SAVING
+}
+
+enum FinancePlanPeriod {
+  MONTH
+  QUARTER
+  YEAR
+  CUSTOM
+}
+
+/// A recurring rule, not a row per month: "500 on food, monthly, from
+/// September" answers for every month that follows without being re-entered.
+/// CUSTOM is the escape hatch for a one-off window bounded by startDate/endDate.
+model FinancePlan {
+  id       String            @id @default(uuid())
+  userId   String            @map("user_id")
+  kind     FinancePlanKind
+  name     String
+  amount   Decimal           @db.Decimal(28, 8)
+  currency String            @db.VarChar(10)
+  period   FinancePlanPeriod
+
+  /// The rule applies from this date; endDate closes it (null = open-ended).
+  startDate DateTime  @map("start_date")
+  endDate   DateTime? @map("end_date")
+
+  /// LIMIT caps one expense category; GOAL fills one account. SAVING needs
+  /// neither — it measures income minus expense across everything.
+  articleId String? @map("article_id")
+  accountId String? @map("account_id")
+
+  isArchived Boolean  @default(false) @map("is_archived")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article FinanceArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  account FinanceAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, kind])
+  @@index([userId, isArchived])
+  @@map("finance_plans")
 }
