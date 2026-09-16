@@ -240,6 +240,62 @@ describe('AccountService', () => {
     });
   });
 
+  describe('net worth with debts', () => {
+    it('cancels a loan against a receivable for the same money', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({ id: 'loan', kind: 'LOAN', openingBalance: D(-5000) }),
+        account({ id: 'lent', kind: 'RECEIVABLE', openingBalance: D(5000) }),
+      ]);
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+      });
+
+      // Borrowed 5000 and lent the same 5000 onward: owed and owed-to-you
+      // offset, so nothing is created out of thin air.
+      expect(result.totalAssets).toBe('5000.00');
+      expect(result.totalLiabilities).toBe('5000.00');
+      expect(result.netWorth).toBe('0.00');
+    });
+
+    it('keeps net worth flat when money is lent through a transfer', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({ id: 'bank', kind: 'BANK', openingBalance: D(5000) }),
+        account({ id: 'lent', kind: 'RECEIVABLE', openingBalance: D(0) }),
+      ]);
+      prisma.currencyConversion.groupBy
+        .mockResolvedValueOnce([
+          { fromAccountId: 'bank', _sum: { fromAmount: D(5000) } },
+        ])
+        .mockResolvedValueOnce([
+          { toAccountId: 'lent', _sum: { toAmount: D(5000) } },
+        ]);
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+      });
+
+      // The money changed pocket, it did not change quantity.
+      expect(result.netWorth).toBe('5000.00');
+    });
+
+    it('treats a credit card balance as a liability', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue([
+        account({ id: 'card', kind: 'CREDIT_CARD', openingBalance: D(-800) }),
+      ]);
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+      });
+
+      expect(result.totalLiabilities).toBe('800.00');
+      expect(result.netWorth).toBe('-800.00');
+    });
+  });
+
   describe('getDebts', () => {
     const lent = (over: Record<string, unknown> = {}) =>
       account({
