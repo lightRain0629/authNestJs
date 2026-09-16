@@ -5,6 +5,7 @@ export * from './create-record.dto';
 export * from './update-record.dto';
 export * from './list-records.dto';
 export * from './create-rate.dto';
+export * from './update-rate.dto';
 export * from './list-rates.dto';
 export * from './latest-rate.dto';
 export * from './create-conversion.dto';

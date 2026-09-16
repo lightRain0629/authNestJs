@@ -10,6 +10,8 @@ const mockPrisma = () => ({
     findMany: jest.fn(),
     findFirst: jest.fn(),
     findUnique: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
   },
 });
 
@@ -185,6 +187,88 @@ describe('RateService', () => {
           quoteCurrency: 'EUR',
         }),
       });
+    });
+  });
+
+  describe('update', () => {
+    const existing: CurrencyRate = {
+      id: 'rate-1',
+      userId: TEST_USER_ID,
+      baseCurrency: 'USD',
+      quoteCurrency: 'EUR',
+      rate: new Prisma.Decimal('0.92'),
+      source: 'manual',
+      effectiveAt: new Date('2024-01-15T00:00:00Z'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should normalize currencies and coerce the rate to a Decimal', async () => {
+      prisma.currencyRate.findFirst.mockResolvedValue(existing);
+      prisma.currencyRate.update.mockResolvedValue(existing);
+
+      await service.update('rate-1', TEST_USER_ID, {
+        baseCurrency: 'usd',
+        quoteCurrency: 'eur',
+        rate: '0.95',
+      });
+
+      expect(prisma.currencyRate.update).toHaveBeenCalledWith({
+        where: { id: 'rate-1' },
+        data: {
+          baseCurrency: 'USD',
+          quoteCurrency: 'EUR',
+          rate: new Prisma.Decimal('0.95'),
+        },
+      });
+    });
+
+    it('should touch only the fields supplied', async () => {
+      prisma.currencyRate.findFirst.mockResolvedValue(existing);
+      prisma.currencyRate.update.mockResolvedValue(existing);
+
+      await service.update('rate-1', TEST_USER_ID, { rate: '1.10' });
+
+      expect(prisma.currencyRate.update).toHaveBeenCalledWith({
+        where: { id: 'rate-1' },
+        data: { rate: new Prisma.Decimal('1.10') },
+      });
+    });
+
+    it("should not update another user's rate", async () => {
+      prisma.currencyRate.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.update('rate-1', TEST_USER_ID, { rate: '1.10' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.currencyRate.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove', () => {
+    it('should delete a rate the user owns', async () => {
+      const existing = {
+        id: 'rate-1',
+        userId: TEST_USER_ID,
+      } as CurrencyRate;
+      prisma.currencyRate.findFirst.mockResolvedValue(existing);
+      prisma.currencyRate.delete.mockResolvedValue(existing);
+
+      const result = await service.remove('rate-1', TEST_USER_ID);
+
+      expect(result).toEqual(existing);
+      expect(prisma.currencyRate.delete).toHaveBeenCalledWith({
+        where: { id: 'rate-1' },
+      });
+    });
+
+    it("should not delete another user's rate", async () => {
+      prisma.currencyRate.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove('rate-1', TEST_USER_ID)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.currencyRate.delete).not.toHaveBeenCalled();
     });
   });
 });

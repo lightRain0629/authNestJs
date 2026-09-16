@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateRateDto, ListRatesDto, LatestRateDto } from '../dto';
+import {
+  CreateRateDto,
+  UpdateRateDto,
+  ListRatesDto,
+  LatestRateDto,
+} from '../dto';
 import { CurrencyRate, Prisma } from '@prisma/client';
 
 export interface RateLookupResult {
@@ -171,6 +176,43 @@ export class RateService {
     throw new NotFoundException(
       `No FX rate found for ${fromCurrency}/${toCurrency} at ${targetDate.toISOString()}`,
     );
+  }
+
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateRateDto,
+  ): Promise<CurrencyRate> {
+    await this.findById(id, userId);
+
+    return this.prisma.currencyRate.update({
+      where: { id },
+      data: {
+        ...(dto.baseCurrency !== undefined
+          ? { baseCurrency: dto.baseCurrency.toUpperCase() }
+          : {}),
+        ...(dto.quoteCurrency !== undefined
+          ? { quoteCurrency: dto.quoteCurrency.toUpperCase() }
+          : {}),
+        ...(dto.rate !== undefined
+          ? { rate: new Prisma.Decimal(dto.rate) }
+          : {}),
+        ...(dto.source !== undefined ? { source: dto.source } : {}),
+        ...(dto.effectiveAt !== undefined
+          ? { effectiveAt: new Date(dto.effectiveAt) }
+          : {}),
+      },
+    });
+  }
+
+  /**
+   * Conversions booked against this rate keep their own `rateUsed` snapshot, so
+   * removing the rate re-points them to null without restating past history.
+   */
+  async remove(id: string, userId: string): Promise<CurrencyRate> {
+    await this.findById(id, userId);
+
+    return this.prisma.currencyRate.delete({ where: { id } });
   }
 
   async findById(id: string, userId: string): Promise<CurrencyRate> {
