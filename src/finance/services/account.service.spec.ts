@@ -296,6 +296,85 @@ describe('AccountService', () => {
     });
   });
 
+  describe('net worth without money lent out', () => {
+    const mixed = () => [
+      account({ id: 'bank', kind: 'BANK', openingBalance: D(1000) }),
+      account({ id: 'lent', kind: 'RECEIVABLE', openingBalance: D(400) }),
+      account({ id: 'loan', kind: 'LOAN', openingBalance: D(-200) }),
+    ];
+
+    it('counts money lent out by default', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue(mixed());
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+      });
+
+      expect(result.totalAssets).toBe('1400.00');
+      expect(result.netWorth).toBe('1200.00');
+    });
+
+    it('leaves it out when asked, without touching liabilities', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue(mixed());
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+        excludeReceivables: true,
+      });
+
+      // 1000 on hand, still owing 200.
+      expect(result.totalAssets).toBe('1000.00');
+      expect(result.totalLiabilities).toBe('200.00');
+      expect(result.netWorth).toBe('800.00');
+    });
+
+    it('drops it from the allocation breakdown too', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue(mixed());
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+        excludeReceivables: true,
+      });
+
+      expect(result.byKind.map((k) => k.kind)).not.toContain('RECEIVABLE');
+    });
+
+    it('still lists the lent account so it stays visible', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue(mixed());
+
+      const result = await service.getBalances(userId, {
+        asOf,
+        baseCurrency: 'TMT',
+        excludeReceivables: true,
+      });
+
+      expect(result.accounts.map((a) => a.account.id)).toContain('lent');
+    });
+
+    it('keeps the trend consistent with the headline', async () => {
+      prisma.financeAccount.findMany.mockResolvedValue(mixed());
+
+      await service.getNetWorthHistory(userId, {
+        from: '2026-01-01T00:00:00.000Z',
+        to: '2026-06-30T00:00:00.000Z',
+        interval: 'month',
+        baseCurrency: 'TMT',
+        excludeReceivables: true,
+      });
+
+      expect(prisma.financeAccount.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            kind: { not: 'RECEIVABLE' },
+          }),
+        }),
+      );
+    });
+  });
+
   describe('getDebts', () => {
     const lent = (over: Record<string, unknown> = {}) =>
       account({

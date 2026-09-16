@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsIn,
   IsOptional,
@@ -28,4 +30,13 @@ export class NetWorthHistoryDto {
   @IsOptional()
   @Matches(/^[A-Za-z0-9]{2,10}$/, { message: 'Invalid base currency' })
   baseCurrency?: string;
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Leave money you have lent out of the totals, showing only what is actually within reach.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  excludeReceivables?: boolean = false;
 }

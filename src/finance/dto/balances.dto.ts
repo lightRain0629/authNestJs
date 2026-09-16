@@ -31,4 +31,13 @@ export class BalancesDto {
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   includeArchived?: boolean = false;
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Leave money you have lent out of the totals, showing only what is actually within reach.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  excludeReceivables?: boolean = false;
 }

@@ -56,6 +56,19 @@ export class AccountService {
     return LIABILITY_KINDS.includes(kind);
   }
 
+  /**
+   * Money lent out is an asset, but it is not money you can reach. Excluding it
+   * answers a different, equally real question: what is actually on hand.
+   */
+  private static countsTowardsNetWorth(
+    account: Pick<FinanceAccount, 'kind' | 'excludeFromNetWorth'>,
+    excludeReceivables: boolean,
+  ): boolean {
+    if (account.excludeFromNetWorth) return false;
+    if (excludeReceivables && account.kind === 'RECEIVABLE') return false;
+    return true;
+  }
+
   // ============ CRUD ============
 
   async create(userId: string, dto: CreateAccountDto): Promise<FinanceAccount> {
@@ -273,6 +286,7 @@ export class AccountService {
   ): Promise<BalancesResponse> {
     const asOf = query.asOf ? new Date(query.asOf) : new Date();
     const baseCurrency = query.baseCurrency?.toUpperCase() ?? null;
+    const excludeReceivables = query.excludeReceivables ?? false;
 
     const accounts = await this.prisma.financeAccount.findMany({
       where: {
@@ -310,7 +324,11 @@ export class AccountService {
         isLiability,
       });
 
-      if (account.excludeFromNetWorth || converted.value === null) continue;
+      if (
+        !AccountService.countsTowardsNetWorth(account, excludeReceivables) ||
+        converted.value === null
+      )
+        continue;
 
       if (isLiability) {
         // A loan balance is negative while money is owed; report it as a positive debt.
@@ -320,7 +338,12 @@ export class AccountService {
       }
     }
 
-    const byKind = this.buildKindBreakdown(accounts, balances, totalAssets);
+    const byKind = this.buildKindBreakdown(
+      accounts,
+      balances,
+      totalAssets,
+      excludeReceivables,
+    );
 
     return new BalancesResponse({
       accounts: balances,
@@ -341,6 +364,7 @@ export class AccountService {
     accounts: FinanceAccount[],
     balances: AccountBalance[],
     totalAssets: Prisma.Decimal,
+    excludeReceivables: boolean,
   ): KindBreakdown[] {
     const byKind = new Map<
       FinanceAccountKind,
@@ -350,7 +374,11 @@ export class AccountService {
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i];
       const converted = balances[i].balanceInBase;
-      if (account.excludeFromNetWorth || converted === null) continue;
+      if (
+        !AccountService.countsTowardsNetWorth(account, excludeReceivables) ||
+        converted === null
+      )
+        continue;
 
       const entry = byKind.get(account.kind) ?? { total: ZERO, count: 0 };
       entry.total = entry.total.add(new Prisma.Decimal(converted));
@@ -588,7 +616,12 @@ export class AccountService {
     const boundaries = this.periodBoundaries(from, to, interval);
 
     const accounts = await this.prisma.financeAccount.findMany({
-      where: { userId, excludeFromNetWorth: false },
+      where: {
+        userId,
+        excludeFromNetWorth: false,
+        // Kept out of the trend too, so the chart matches the headline.
+        ...(query.excludeReceivables ? { kind: { not: 'RECEIVABLE' } } : {}),
+      },
     });
 
     if (accounts.length === 0) {
