@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -23,7 +24,11 @@ import { Request } from 'express';
 import { CurrentUser } from '@common/src/decorators';
 import { JwtPayload } from '../../auth/interfaces';
 import { ConversionService } from '../services';
-import { CreateConversionDto, ListConversionsDto } from '../dto';
+import {
+  CreateConversionDto,
+  ListConversionsDto,
+  UpdateConversionDto,
+} from '../dto';
 import { ConversionResponse } from '../responses';
 import {
   buildPagination,
@@ -89,6 +94,26 @@ export class ConversionController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ConversionResponse> {
     const conversion = await this.conversionService.findOne(id, user.id);
+    return new ConversionResponse(conversion);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Update a currency conversion',
+    description:
+      'Re-books the transfer from the merged state: amounts, currencies, ' +
+      'accounts and rate are all recomputed so they stay consistent. A ' +
+      'conversion booked at a custom rate keeps it unless you change a ' +
+      'currency or send a new one.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: ConversionResponse })
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateConversionDto,
+  ): Promise<ConversionResponse> {
+    const conversion = await this.conversionService.update(id, user.id, dto);
     return new ConversionResponse(conversion);
   }
 

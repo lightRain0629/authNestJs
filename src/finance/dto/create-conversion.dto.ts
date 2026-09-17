@@ -73,6 +73,21 @@ export class CreateConversionDto {
   toAccountId?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Rate to book this conversion at, overriding the rate table. Use it ' +
+      'when the rate you actually got differs from the published one. ' +
+      'Omit to look the rate up at operationDate as before. Rejected on a ' +
+      'same-currency transfer, which always books at 1.',
+    example: '19.50',
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d*\.?\d+$/, {
+    message: 'Rate must be a positive decimal string',
+  })
+  rate?: string;
+
+  @ApiPropertyOptional({
     description: 'Fee amount (as string decimal)',
     example: '5.00',
   })

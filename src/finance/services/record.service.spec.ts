@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { RecordService } from './record.service';
 import { ArticleService } from './article.service';
 import { AccountService } from './account.service';
@@ -70,6 +74,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.EXPENSE,
         amount: new Prisma.Decimal('100.00'),
         currency: 'USD',
+        baseCurrency: null,
+        baseRate: null,
         articleId: null,
         accountId: null,
         remark: 'Test expense',
@@ -85,6 +91,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.EXPENSE,
         amount: '100.00',
         currency: 'USD',
+        baseCurrency: null,
+        baseRate: null,
         remark: 'Test expense',
         operationDate: '2024-01-15T00:00:00Z',
       });
@@ -113,6 +121,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.EXPENSE,
         amount: new Prisma.Decimal('50.00'),
         currency: 'EUR',
+        baseCurrency: null,
+        baseRate: null,
         articleId: 'art-1',
         accountId: null,
         remark: null,
@@ -129,6 +139,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.EXPENSE,
         amount: '50.00',
         currency: 'EUR',
+        baseCurrency: null,
+        baseRate: null,
         articleId: 'art-1',
         accountId: null,
         operationDate: '2024-01-15T00:00:00Z',
@@ -154,6 +166,8 @@ describe('RecordService', () => {
           type: FinanceRecordType.EXPENSE,
           amount: '50.00',
           currency: 'EUR',
+          baseCurrency: null,
+          baseRate: null,
           articleId: 'income-article-id',
           accountId: null,
           operationDate: '2024-01-15T00:00:00Z',
@@ -168,6 +182,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.INCOME,
         amount: new Prisma.Decimal('200.00'),
         currency: 'EUR',
+        baseCurrency: null,
+        baseRate: null,
         articleId: null,
         accountId: null,
         remark: null,
@@ -190,6 +206,8 @@ describe('RecordService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             currency: 'EUR',
+            baseCurrency: null,
+            baseRate: null,
           }),
         }),
       );
@@ -204,6 +222,8 @@ describe('RecordService', () => {
         type: FinanceRecordType.EXPENSE,
         amount: new Prisma.Decimal('100.00'),
         currency: 'USD',
+        baseCurrency: null,
+        baseRate: null,
         articleId: null,
         accountId: null,
         remark: null,
@@ -242,6 +262,8 @@ describe('RecordService', () => {
           type: FinanceRecordType.EXPENSE,
           amount: new Prisma.Decimal('100.00'),
           currency: 'USD',
+          baseCurrency: null,
+          baseRate: null,
           articleId: null,
           accountId: null,
           remark: null,
@@ -303,6 +325,80 @@ describe('RecordService', () => {
       expect(parse('groceries')).toBeNull();
       expect(parse('')).toBeNull();
       expect(parse('12abc')).toBeNull();
+    });
+  });
+
+  describe('custom base rate', () => {
+    it('stores the pair when both halves are sent', () => {
+      expect(RecordService.resolveBaseRate('tmt', '19.5', 'USD')).toEqual({
+        baseCurrency: 'TMT',
+        baseRate: new Prisma.Decimal('19.5'),
+      });
+    });
+
+    it('stores nothing when neither half is sent', () => {
+      expect(
+        RecordService.resolveBaseRate(undefined, undefined, 'USD'),
+      ).toEqual({ baseCurrency: null, baseRate: null });
+    });
+
+    it('rejects a rate with no currency to convert into', () => {
+      expect(() =>
+        RecordService.resolveBaseRate(undefined, '19.5', 'USD'),
+      ).toThrow(UnprocessableEntityException);
+    });
+
+    it('rejects a currency with no rate', () => {
+      expect(() =>
+        RecordService.resolveBaseRate('TMT', undefined, 'USD'),
+      ).toThrow(UnprocessableEntityException);
+    });
+
+    it('rejects a rate into the currency the record is already in', () => {
+      expect(() => RecordService.resolveBaseRate('USD', '1', 'USD')).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('rejects a rate of zero', () => {
+      expect(() => RecordService.resolveBaseRate('TMT', '0', 'USD')).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('persists the override on create', async () => {
+      prisma.financeRecord.create.mockResolvedValue({});
+
+      await service.create(userId, {
+        type: 'EXPENSE',
+        amount: '100',
+        currency: 'USD',
+        operationDate: '2024-01-15T00:00:00Z',
+        baseCurrency: 'TMT',
+        baseRate: '19.5',
+      });
+
+      const data = prisma.financeRecord.create.mock.calls[0][0].data;
+      expect(data.baseCurrency).toBe('TMT');
+      expect(data.baseRate.toString()).toBe('19.5');
+    });
+
+    it('re-validates the override when the currency alone changes', async () => {
+      prisma.financeRecord.findFirst.mockResolvedValue({
+        id: 'rec-1',
+        userId,
+        type: 'EXPENSE',
+        currency: 'USD',
+        baseCurrency: 'TMT',
+        baseRate: new Prisma.Decimal('19.5'),
+        accountId: null,
+        articleId: null,
+      });
+
+      // Moving the record into TMT makes its TMT rate meaningless.
+      await expect(
+        service.update('rec-1', userId, { currency: 'TMT' }),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
   });
 });

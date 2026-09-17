@@ -48,6 +48,35 @@ export class CreateRecordDto {
   currency: string;
 
   @ApiPropertyOptional({
+    description:
+      "Currency this record's custom rate converts into. Required together " +
+      'with baseRate. Reports asking for any other base currency fall back ' +
+      'to the rate table.',
+    example: 'TMT',
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^[A-Z0-9]{2,10}$/, {
+    message:
+      'Currency must be a 2-10 character uppercase ticker (USD, TMT, BTC, USDT)',
+  })
+  baseCurrency?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Rate from this record's currency into baseCurrency, overriding the " +
+      'rate table for this record alone. Use it when the rate you actually ' +
+      'got differs from the published one. Required together with baseCurrency.',
+    example: '19.50',
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d*\.?\d+$/, {
+    message: 'Rate must be a positive decimal string',
+  })
+  baseRate?: string;
+
+  @ApiPropertyOptional({
     description: 'Article (category) ID',
     format: 'uuid',
   })

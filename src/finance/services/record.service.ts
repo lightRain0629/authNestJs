@@ -1,9 +1,26 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRecordDto, UpdateRecordDto, ListRecordsDto } from '../dto';
 import { FinanceRecord, FinanceArticleKind, Prisma } from '@prisma/client';
 import { ArticleService } from './article.service';
 import { AccountService } from './account.service';
+
+/**
+ * Structural so both the records table and the conversions table can be
+ * filtered by the same parsed amount query; Prisma's own DecimalFilter is
+ * tagged with its model and will not cross between the two.
+ */
+export type AmountFilter = {
+  equals?: Prisma.Decimal;
+  gt?: Prisma.Decimal;
+  gte?: Prisma.Decimal;
+  lt?: Prisma.Decimal;
+  lte?: Prisma.Decimal;
+};
 
 type RecordWithArticle = FinanceRecord & {
   article?: {
@@ -49,12 +66,20 @@ export class RecordService {
       );
     }
 
+    const baseRate = RecordService.resolveBaseRate(
+      dto.baseCurrency,
+      dto.baseRate,
+      dto.currency.toUpperCase(),
+    );
+
     return this.prisma.financeRecord.create({
       data: {
         userId,
         type: dto.type,
         amount: new Prisma.Decimal(dto.amount),
         currency: dto.currency.toUpperCase(),
+        baseCurrency: baseRate.baseCurrency,
+        baseRate: baseRate.baseRate,
         articleId: dto.articleId ?? null,
         accountId: dto.accountId ?? null,
         remark: dto.remark ?? null,
@@ -162,9 +187,7 @@ export class RecordService {
   }
 
   /** Recognises "1200", ">=500", "<10.5" and "100-250". */
-  static parseAmountQuery(
-    search: string,
-  ): Prisma.DecimalFilter<'FinanceRecord'> | null {
+  static parseAmountQuery(search: string): AmountFilter | null {
     const text = search.trim();
     if (!text) return null;
 
@@ -284,6 +307,26 @@ export class RecordService {
     if (dto.operationDate !== undefined)
       updateData.operationDate = new Date(dto.operationDate);
 
+    // The override is a pair, so it is re-validated whenever either half moves
+    // — including when only the currency changed underneath it.
+    if (
+      dto.baseCurrency !== undefined ||
+      dto.baseRate !== undefined ||
+      dto.currency !== undefined
+    ) {
+      const resolved = RecordService.resolveBaseRate(
+        dto.baseCurrency !== undefined
+          ? dto.baseCurrency
+          : record.baseCurrency ?? undefined,
+        dto.baseRate !== undefined
+          ? dto.baseRate
+          : record.baseRate?.toString() ?? undefined,
+        newCurrency.toUpperCase(),
+      );
+      updateData.baseCurrency = resolved.baseCurrency;
+      updateData.baseRate = resolved.baseRate;
+    }
+
     return this.prisma.financeRecord.update({
       where: { id },
       data: updateData,
@@ -302,6 +345,46 @@ export class RecordService {
         },
       },
     });
+  }
+
+  /**
+   * The custom rate and the currency it converts into only mean anything
+   * together, so they are stored together or not at all. Sending one without
+   * the other is a mistake worth reporting rather than half-storing.
+   */
+  static resolveBaseRate(
+    baseCurrency: string | null | undefined,
+    baseRate: string | null | undefined,
+    recordCurrency: string,
+  ): { baseCurrency: string | null; baseRate: Prisma.Decimal | null } {
+    const currency = baseCurrency ? baseCurrency.toUpperCase() : null;
+    const rate =
+      baseRate !== null && baseRate !== undefined && baseRate !== ''
+        ? baseRate
+        : null;
+
+    if (!currency && !rate) return { baseCurrency: null, baseRate: null };
+
+    if (!currency || !rate) {
+      throw new UnprocessableEntityException(
+        'baseCurrency and baseRate must be sent together',
+      );
+    }
+
+    if (currency === recordCurrency) {
+      throw new UnprocessableEntityException(
+        `A record in ${recordCurrency} needs no rate into ${currency}`,
+      );
+    }
+
+    const decimal = new Prisma.Decimal(rate);
+    if (decimal.lessThanOrEqualTo(0)) {
+      throw new UnprocessableEntityException(
+        'baseRate must be greater than zero',
+      );
+    }
+
+    return { baseCurrency: currency, baseRate: decimal };
   }
 
   async remove(id: string, userId: string): Promise<FinanceRecord> {

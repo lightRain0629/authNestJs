@@ -2,6 +2,7 @@ export * from './article.response';
 export * from './record.response';
 export * from './rate.response';
 export * from './conversion.response';
+export * from './transaction.response';
 export * from './summary.response';
 export * from './account.response';
 export * from './balance.response';

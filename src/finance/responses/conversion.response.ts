@@ -27,6 +27,13 @@ export class ConversionResponse {
   @ApiPropertyOptional({ format: 'uuid' })
   rateId: string | null;
 
+  @ApiProperty({
+    description:
+      'The rate was supplied by the user rather than read from the rate ' +
+      'table, which is why rateId is null.',
+  })
+  isCustomRate: boolean;
+
   @ApiPropertyOptional({ format: 'uuid' })
   fromAccountId: string | null;
 
@@ -69,6 +76,7 @@ export class ConversionResponse {
         ? conversion.rateUsed.toString()
         : String(conversion.rateUsed);
     this.rateId = conversion.rateId;
+    this.isCustomRate = conversion.isCustomRate;
     this.fromAccountId = conversion.fromAccountId;
     this.toAccountId = conversion.toAccountId;
     this.feeAmount =

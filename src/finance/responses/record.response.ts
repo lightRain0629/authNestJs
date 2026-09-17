@@ -35,6 +35,18 @@ export class RecordResponse {
   @ApiProperty({ description: 'Currency ISO code' })
   currency: string;
 
+  @ApiPropertyOptional({
+    description: "Currency this record's custom rate converts into",
+  })
+  baseCurrency: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Custom rate into baseCurrency, used instead of the rate table when a ' +
+      'report asks for exactly that base currency',
+  })
+  baseRate: string | null;
+
   @ApiPropertyOptional({ format: 'uuid' })
   articleId: string | null;
 
@@ -79,6 +91,8 @@ export class RecordResponse {
         ? record.amount.toString()
         : String(record.amount);
     this.currency = record.currency;
+    this.baseCurrency = record.baseCurrency;
+    this.baseRate = record.baseRate ? record.baseRate.toString() : null;
     this.articleId = record.articleId;
     this.accountId = record.accountId;
     this.remark = record.remark;

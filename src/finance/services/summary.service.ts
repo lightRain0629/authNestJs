@@ -33,8 +33,10 @@ export class SummaryService {
     const fromDate = new Date(query.from);
     const toDate = new Date(query.to);
 
+    // Records carrying their own rate group separately, because a group total
+    // can only be converted once and those convert at a different rate.
     const records = await this.prisma.financeRecord.groupBy({
-      by: ['type', 'currency'],
+      by: ['type', 'currency', 'baseCurrency', 'baseRate'],
       where: {
         userId,
         operationDate: {
@@ -51,12 +53,11 @@ export class SummaryService {
     const expense: Record<string, string> = {};
 
     for (const record of records) {
-      const amount = record._sum.amount?.toString() ?? '0';
-      if (record.type === 'INCOME') {
-        income[record.currency] = amount;
-      } else {
-        expense[record.currency] = amount;
-      }
+      const amount = record._sum.amount ?? new Prisma.Decimal(0);
+      const bucket = record.type === 'INCOME' ? income : expense;
+      bucket[record.currency] = new Prisma.Decimal(bucket[record.currency] ?? 0)
+        .add(amount)
+        .toString();
     }
 
     const conversions = await this.prisma.currencyConversion.findMany({
@@ -103,26 +104,35 @@ export class SummaryService {
       let totalIncome = new Prisma.Decimal(0);
       let totalExpense = new Prisma.Decimal(0);
 
-      for (const [currency, amount] of Object.entries(income)) {
-        const converted = await this.convertToBase(
+      for (const record of records) {
+        const converted = await this.convertRecordToBase(
           userId,
-          new Prisma.Decimal(amount),
-          currency,
+          record._sum.amount ?? new Prisma.Decimal(0),
+          record.currency,
+          record.baseCurrency,
+          record.baseRate,
           baseCurrency,
           toDate,
         );
-        totalIncome = totalIncome.add(converted);
+        if (record.type === 'INCOME') {
+          totalIncome = totalIncome.add(converted);
+        } else {
+          totalExpense = totalExpense.add(converted);
+        }
       }
 
-      for (const [currency, amount] of Object.entries(expense)) {
-        const converted = await this.convertToBase(
-          userId,
-          new Prisma.Decimal(amount),
-          currency,
-          baseCurrency,
-          toDate,
+      // Fees belong to a conversion, not a record, so they never carry an
+      // override and always convert at the table rate.
+      for (const [currency, amount] of Object.entries(conversionFees)) {
+        totalExpense = totalExpense.add(
+          await this.convertToBase(
+            userId,
+            amount,
+            currency,
+            baseCurrency,
+            toDate,
+          ),
         );
-        totalExpense = totalExpense.add(converted);
       }
 
       response.incomeBaseCurrency = totalIncome.toFixed(2);
@@ -157,7 +167,7 @@ export class SummaryService {
     const baseCurrency = query.baseCurrency?.toUpperCase();
 
     const grouped = await this.prisma.financeRecord.groupBy({
-      by: ['articleId', 'currency'],
+      by: ['articleId', 'currency', 'baseCurrency', 'baseRate'],
       where: {
         userId,
         type,
@@ -189,10 +199,12 @@ export class SummaryService {
 
       for (const g of grouped) {
         const raw = g._sum.amount ?? new Prisma.Decimal(0);
-        const converted = await this.convertToBase(
+        const converted = await this.convertRecordToBase(
           userId,
           raw,
           g.currency,
+          g.baseCurrency,
+          g.baseRate,
           baseCurrency,
           toDate,
         );
@@ -240,21 +252,42 @@ export class SummaryService {
       ).add(amount);
     }
 
-    const items = grouped
-      .map((g) => {
-        const amount = g._sum.amount ?? new Prisma.Decimal(0);
-        const article = g.articleId ? articleMap.get(g.articleId) : null;
-        const grandTotal = currencyTotals[g.currency];
+    // Grouping by the rate override splits one category across several rows,
+    // so they are folded back together — a chart slice is per category and
+    // currency, not per rate the records happened to be booked at.
+    const byCategory = new Map<
+      string,
+      { articleId: string | null; currency: string; amount: Prisma.Decimal }
+    >();
+    for (const g of grouped) {
+      const key = `${g.articleId ?? ''}|${g.currency}`;
+      const existing = byCategory.get(key);
+      const amount = g._sum.amount ?? new Prisma.Decimal(0);
+      if (existing) {
+        existing.amount = existing.amount.add(amount);
+      } else {
+        byCategory.set(key, {
+          articleId: g.articleId,
+          currency: g.currency,
+          amount,
+        });
+      }
+    }
+
+    const items = Array.from(byCategory.values())
+      .map(({ articleId, currency, amount }) => {
+        const article = articleId ? articleMap.get(articleId) : null;
+        const grandTotal = currencyTotals[currency];
         const percentage = grandTotal.isZero()
           ? 0
           : parseFloat(amount.mul(100).div(grandTotal).toFixed(2));
 
         return {
-          articleId: g.articleId,
+          articleId,
           categoryName: article?.name ?? 'No Category',
           categoryColor: article?.color ?? '#B0BEC5',
           total: amount.toString(),
-          currency: g.currency,
+          currency,
           percentage,
         };
       })
@@ -287,7 +320,13 @@ export class SummaryService {
     const convert = async (
       amount: Prisma.Decimal,
       currency: string,
+      overrideBase: string | null = null,
+      overrideRate: Prisma.Decimal | null = null,
     ): Promise<Prisma.Decimal | null> => {
+      // A rate the user typed for this record wins, and can never be missing.
+      if (overrideRate && overrideBase === baseCurrency) {
+        return amount.mul(overrideRate);
+      }
       if (currency === baseCurrency) return amount;
       const key = currency;
       if (!rateCache.has(key)) {
@@ -317,6 +356,8 @@ export class SummaryService {
         type: true,
         amount: true,
         currency: true,
+        baseCurrency: true,
+        baseRate: true,
         operationDate: true,
         article: { select: { id: true, name: true, color: true } },
         account: { select: { id: true, name: true, color: true, kind: true } },
@@ -367,7 +408,12 @@ export class SummaryService {
     };
 
     for (const record of records) {
-      const converted = await convert(record.amount, record.currency);
+      const converted = await convert(
+        record.amount,
+        record.currency,
+        record.baseCurrency,
+        record.baseRate,
+      );
       if (converted === null) continue;
 
       const bucketKey = this.bucketKey(record.operationDate, interval);
@@ -483,6 +529,32 @@ export class SummaryService {
       });
     }
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /**
+   * A record booked at a rate the user typed converts at that rate — but only
+   * into the currency they typed it against. Asked for any other base, it falls
+   * back to the rate table rather than applying a rate that means nothing there.
+   */
+  private async convertRecordToBase(
+    userId: string,
+    amount: Prisma.Decimal,
+    fromCurrency: string,
+    overrideBase: string | null,
+    overrideRate: Prisma.Decimal | null,
+    baseCurrency: string,
+    asOfDate: Date,
+  ): Promise<Prisma.Decimal> {
+    if (overrideRate && overrideBase === baseCurrency) {
+      return amount.mul(overrideRate);
+    }
+    return this.convertToBase(
+      userId,
+      amount,
+      fromCurrency,
+      baseCurrency,
+      asOfDate,
+    );
   }
 
   private async convertToBase(

@@ -4,7 +4,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateConversionDto, ListConversionsDto } from '../dto';
+import {
+  CreateConversionDto,
+  ListConversionsDto,
+  UpdateConversionDto,
+} from '../dto';
 import { CurrencyConversion, Prisma } from '@prisma/client';
 import { RateService } from './rate.service';
 import { AccountService } from './account.service';
@@ -50,56 +54,24 @@ export class ConversionService {
     }
 
     const fromAmount = new Prisma.Decimal(dto.fromAmount);
-
-    // Moving money between accounts of the same currency needs no FX rate at all.
-    if (fromCurrency === toCurrency) {
-      return this.prisma.currencyConversion.create({
-        data: {
-          userId,
-          fromAmount,
-          fromCurrency,
-          toAmount: fromAmount,
-          toCurrency,
-          rateUsed: new Prisma.Decimal(1),
-          rateId: null,
-          fromAccountId: dto.fromAccountId ?? null,
-          toAccountId: dto.toAccountId ?? null,
-          feeAmount: dto.feeAmount ? new Prisma.Decimal(dto.feeAmount) : null,
-          feeCurrency: dto.feeCurrency?.toUpperCase() ?? null,
-          remark: dto.remark ?? null,
-          operationDate,
-        },
-      });
-    }
-
-    let rateLookup;
-    try {
-      rateLookup = await this.rateService.findRateForDate(
-        userId,
-        fromCurrency,
-        toCurrency,
-        operationDate,
-      );
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new UnprocessableEntityException(
-          `No FX rate found for ${fromCurrency}/${toCurrency} at ${operationDate.toISOString()}`,
-        );
-      }
-      throw error;
-    }
-
-    const toAmount = fromAmount.mul(rateLookup.effectiveRate);
+    const booking = await this.resolveRate(
+      userId,
+      fromCurrency,
+      toCurrency,
+      operationDate,
+      dto.rate,
+    );
 
     return this.prisma.currencyConversion.create({
       data: {
         userId,
         fromAmount,
         fromCurrency,
-        toAmount,
+        toAmount: fromAmount.mul(booking.rate),
         toCurrency,
-        rateUsed: rateLookup.effectiveRate,
-        rateId: rateLookup.rate.id,
+        rateUsed: booking.rate,
+        rateId: booking.rateId,
+        isCustomRate: booking.isCustomRate,
         fromAccountId: dto.fromAccountId ?? null,
         toAccountId: dto.toAccountId ?? null,
         feeAmount: dto.feeAmount ? new Prisma.Decimal(dto.feeAmount) : null,
@@ -108,6 +80,209 @@ export class ConversionService {
         operationDate,
       },
     });
+  }
+
+  /**
+   * Decide what rate a conversion books at. A caller-supplied rate wins over
+   * the table — that is the whole point of the override — and is flagged so the
+   * null `rateId` reads as deliberate rather than as a deleted rate.
+   */
+  private async resolveRate(
+    userId: string,
+    fromCurrency: string,
+    toCurrency: string,
+    operationDate: Date,
+    customRate?: string | null,
+  ): Promise<{
+    rate: Prisma.Decimal;
+    rateId: string | null;
+    isCustomRate: boolean;
+  }> {
+    // Moving money between accounts of the same currency needs no FX rate.
+    if (fromCurrency === toCurrency) {
+      if (
+        customRate !== undefined &&
+        customRate !== null &&
+        !new Prisma.Decimal(customRate).equals(1)
+      ) {
+        throw new UnprocessableEntityException(
+          'A same-currency transfer always books at rate 1',
+        );
+      }
+      return { rate: new Prisma.Decimal(1), rateId: null, isCustomRate: false };
+    }
+
+    if (customRate !== undefined && customRate !== null) {
+      const rate = new Prisma.Decimal(customRate);
+      if (rate.lessThanOrEqualTo(0)) {
+        throw new UnprocessableEntityException(
+          'Rate must be greater than zero',
+        );
+      }
+      return { rate, rateId: null, isCustomRate: true };
+    }
+
+    try {
+      const lookup = await this.rateService.findRateForDate(
+        userId,
+        fromCurrency,
+        toCurrency,
+        operationDate,
+      );
+      return {
+        rate: new Prisma.Decimal(lookup.effectiveRate),
+        rateId: lookup.rate.id,
+        isCustomRate: false,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new UnprocessableEntityException(
+          `No FX rate found for ${fromCurrency}/${toCurrency} at ${operationDate.toISOString()}. ` +
+            'Add a rate for that date, or send an explicit `rate` to book this transfer at your own.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Correcting a transfer is a re-booking: the amounts, the currencies, the
+   * accounts and the rate all have to agree afterwards, so every field is
+   * recomputed from the merged state rather than patched in isolation.
+   */
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateConversionDto,
+  ): Promise<CurrencyConversion> {
+    const existing = await this.findOne(id, userId);
+
+    const fromCurrency = (
+      dto.fromCurrency ?? existing.fromCurrency
+    ).toUpperCase();
+    const toCurrency = (dto.toCurrency ?? existing.toCurrency).toUpperCase();
+    const operationDate =
+      dto.operationDate !== undefined
+        ? new Date(dto.operationDate)
+        : existing.operationDate;
+    const fromAmount =
+      dto.fromAmount !== undefined
+        ? new Prisma.Decimal(dto.fromAmount)
+        : existing.fromAmount;
+
+    // `null` clears the side; `undefined` leaves it as it was.
+    const fromAccountId =
+      dto.fromAccountId !== undefined
+        ? dto.fromAccountId ?? null
+        : existing.fromAccountId;
+    const toAccountId =
+      dto.toAccountId !== undefined
+        ? dto.toAccountId ?? null
+        : existing.toAccountId;
+
+    if (fromAccountId) {
+      await this.accountService.assertAccountUsable(
+        fromAccountId,
+        userId,
+        fromCurrency,
+      );
+    }
+    if (toAccountId) {
+      await this.accountService.assertAccountUsable(
+        toAccountId,
+        userId,
+        toCurrency,
+      );
+    }
+    if (fromAccountId && toAccountId && fromAccountId === toAccountId) {
+      throw new UnprocessableEntityException(
+        'A transfer needs two different accounts',
+      );
+    }
+
+    const booking = await this.resolveRateForUpdate(
+      userId,
+      existing,
+      fromCurrency,
+      toCurrency,
+      operationDate,
+      dto.rate,
+    );
+
+    const feeAmount =
+      dto.feeAmount !== undefined
+        ? dto.feeAmount
+          ? new Prisma.Decimal(dto.feeAmount)
+          : null
+        : existing.feeAmount;
+    const feeCurrency =
+      dto.feeCurrency !== undefined
+        ? dto.feeCurrency?.toUpperCase() ?? null
+        : existing.feeCurrency;
+
+    return this.prisma.currencyConversion.update({
+      where: { id },
+      data: {
+        fromAmount,
+        fromCurrency,
+        toAmount: fromAmount.mul(booking.rate),
+        toCurrency,
+        rateUsed: booking.rate,
+        rateId: booking.rateId,
+        isCustomRate: booking.isCustomRate,
+        fromAccountId,
+        toAccountId,
+        feeAmount,
+        feeCurrency,
+        remark: dto.remark !== undefined ? dto.remark ?? null : existing.remark,
+        operationDate,
+      },
+    });
+  }
+
+  /**
+   * An edit must not silently re-rate a transfer that was booked at a rate the
+   * user typed. So a custom rate survives any edit that leaves the pair alone;
+   * change a currency, or send a new `rate`, to re-rate it deliberately.
+   */
+  private async resolveRateForUpdate(
+    userId: string,
+    existing: CurrencyConversion,
+    fromCurrency: string,
+    toCurrency: string,
+    operationDate: Date,
+    customRate?: string | null,
+  ): Promise<{
+    rate: Prisma.Decimal;
+    rateId: string | null;
+    isCustomRate: boolean;
+  }> {
+    const pairUnchanged =
+      fromCurrency === existing.fromCurrency &&
+      toCurrency === existing.toCurrency;
+
+    if (
+      customRate === undefined &&
+      existing.isCustomRate &&
+      pairUnchanged &&
+      fromCurrency !== toCurrency
+    ) {
+      return {
+        rate: existing.rateUsed,
+        rateId: null,
+        isCustomRate: true,
+      };
+    }
+
+    // null asked for the table rate back, so it must not fall through as a
+    // custom rate of its own.
+    return this.resolveRate(
+      userId,
+      fromCurrency,
+      toCurrency,
+      operationDate,
+      customRate ?? undefined,
+    );
   }
 
   async findAll(

@@ -156,6 +156,11 @@ model FinanceRecord {
   type          FinanceRecordType
   amount        Decimal           @db.Decimal(28, 8)
   currency      String            @db.VarChar(10)
+  // A rate you typed yourself, for when the table rate is not the rate you got.
+  // Only honoured when a report asks for exactly `baseCurrency`; any other base
+  // falls back to the rate table rather than silently misapplying this one.
+  baseCurrency  String?           @map("base_currency") @db.VarChar(10)
+  baseRate      Decimal?          @map("base_rate") @db.Decimal(38, 18)
   articleId     String?           @map("article_id")
   accountId     String?           @map("account_id")
   remark        String?
@@ -201,6 +206,9 @@ model CurrencyConversion {
   toCurrency    String   @map("to_currency") @db.VarChar(10)
   rateUsed      Decimal  @map("rate_used") @db.Decimal(38, 18)
   rateId        String?  @map("rate_id")
+  // rateUsed came from the caller, not the rate table, so rateId is null by
+  // design rather than because the rate was later deleted.
+  isCustomRate  Boolean  @default(false) @map("is_custom_rate")
   fromAccountId String?  @map("from_account_id")
   toAccountId   String?  @map("to_account_id")
   feeAmount     Decimal? @map("fee_amount") @db.Decimal(28, 8)
