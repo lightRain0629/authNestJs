@@ -12,6 +12,16 @@ import {
 import { CurrencyConversion, Prisma } from '@prisma/client';
 import { RateService } from './rate.service';
 import { AccountService } from './account.service';
+import { AttachmentService } from './attachment.service';
+
+/** Attachment count in the same query — no per-row lookups. */
+export const CONVERSION_INCLUDE = {
+  _count: { select: { attachments: true } },
+} satisfies Prisma.CurrencyConversionInclude;
+
+export type ConversionWithCount = CurrencyConversion & {
+  _count?: { attachments: number };
+};
 
 @Injectable()
 export class ConversionService {
@@ -19,12 +29,13 @@ export class ConversionService {
     private readonly prisma: PrismaService,
     private readonly rateService: RateService,
     private readonly accountService: AccountService,
+    private readonly attachmentService: AttachmentService,
   ) {}
 
   async create(
     userId: string,
     dto: CreateConversionDto,
-  ): Promise<CurrencyConversion> {
+  ): Promise<ConversionWithCount> {
     const fromCurrency = dto.fromCurrency.toUpperCase();
     const toCurrency = dto.toCurrency.toUpperCase();
     const operationDate = new Date(dto.operationDate);
@@ -79,6 +90,7 @@ export class ConversionService {
         remark: dto.remark ?? null,
         operationDate,
       },
+      include: CONVERSION_INCLUDE,
     });
   }
 
@@ -154,7 +166,7 @@ export class ConversionService {
     id: string,
     userId: string,
     dto: UpdateConversionDto,
-  ): Promise<CurrencyConversion> {
+  ): Promise<ConversionWithCount> {
     const existing = await this.findOne(id, userId);
 
     const fromCurrency = (
@@ -237,6 +249,7 @@ export class ConversionService {
         remark: dto.remark !== undefined ? dto.remark ?? null : existing.remark,
         operationDate,
       },
+      include: CONVERSION_INCLUDE,
     });
   }
 
@@ -288,7 +301,7 @@ export class ConversionService {
   async findAll(
     userId: string,
     query: ListConversionsDto,
-  ): Promise<{ items: CurrencyConversion[]; total: number }> {
+  ): Promise<{ items: ConversionWithCount[]; total: number }> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.max(1, Math.min(100, query.limit ?? 20));
     const skip = (page - 1) * limit;
@@ -317,6 +330,7 @@ export class ConversionService {
         orderBy: [{ operationDate: 'desc' }, { createdAt: 'desc' }],
         skip,
         take: limit,
+        include: CONVERSION_INCLUDE,
       }),
       this.prisma.currencyConversion.count({ where }),
     ]);
@@ -324,9 +338,10 @@ export class ConversionService {
     return { items, total };
   }
 
-  async findOne(id: string, userId: string): Promise<CurrencyConversion> {
+  async findOne(id: string, userId: string): Promise<ConversionWithCount> {
     const conversion = await this.prisma.currencyConversion.findFirst({
       where: { id, userId },
+      include: CONVERSION_INCLUDE,
     });
 
     if (!conversion) {
@@ -336,11 +351,18 @@ export class ConversionService {
     return conversion;
   }
 
+  /** The cascade drops the attachment rows; their files go after it. */
   async remove(id: string, userId: string): Promise<CurrencyConversion> {
     await this.findOne(id, userId);
 
-    return this.prisma.currencyConversion.delete({
+    const storageKeys = await this.attachmentService.storageKeysFor({
+      conversionId: id,
+    });
+    const conversion = await this.prisma.currencyConversion.delete({
       where: { id },
     });
+    await this.attachmentService.discardFiles(storageKeys);
+
+    return conversion;
   }
 }

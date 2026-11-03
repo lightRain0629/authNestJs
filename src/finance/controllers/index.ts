@@ -6,3 +6,4 @@ export * from './transaction.controller';
 export * from './summary.controller';
 export * from './account.controller';
 export * from './plan.controller';
+export * from './attachment.controller';

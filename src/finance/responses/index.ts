@@ -8,3 +8,4 @@ export * from './account.response';
 export * from './balance.response';
 export * from './cashflow.response';
 export * from './plan.response';
+export * from './attachment.response';

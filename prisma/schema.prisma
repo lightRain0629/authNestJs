@@ -29,6 +29,7 @@ model User {
   currencyConversions CurrencyConversion[]
   currencyRates       CurrencyRate[]
   financePlans        FinancePlan[]
+  financeAttachments  FinanceAttachment[]
 
   @@map("users")
 }
@@ -172,6 +173,8 @@ model FinanceRecord {
   article FinanceArticle? @relation(fields: [articleId], references: [id], onDelete: SetNull)
   account FinanceAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
+  attachments FinanceAttachment[]
+
   @@index([userId, operationDate])
   @@index([userId, type])
   @@index([articleId])
@@ -222,6 +225,8 @@ model CurrencyConversion {
   rate        CurrencyRate?   @relation(fields: [rateId], references: [id], onDelete: SetNull)
   fromAccount FinanceAccount? @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: SetNull)
   toAccount   FinanceAccount? @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: SetNull)
+
+  attachments FinanceAttachment[]
 
   @@index([userId, operationDate])
   @@index([fromCurrency, toCurrency])
@@ -336,4 +341,30 @@ model FinancePlan {
   @@index([userId, kind])
   @@index([userId, isArchived])
   @@map("finance_plans")
+}
+
+/// A file kept alongside a record or a transfer — a statement, a sales report,
+/// a receipt. Exactly one of recordId / conversionId is set (CHECK constraint
+/// `finance_attachments_one_parent` in the migration). The bytes live on disk
+/// under `storageKey`, a random name that never reuses the user's filename.
+model FinanceAttachment {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  recordId     String?  @map("record_id")
+  conversionId String?  @map("conversion_id")
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  storageKey   String   @unique @map("storage_key")
+  sha256       String   @db.Char(64)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  record     FinanceRecord?      @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  conversion CurrencyConversion? @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([recordId])
+  @@index([conversionId])
+  @@map("finance_attachments")
 }

@@ -6,3 +6,5 @@ export * from './transaction.service';
 export * from './summary.service';
 export * from './account.service';
 export * from './plan.service';
+export * from './attachment-storage.service';
+export * from './attachment.service';

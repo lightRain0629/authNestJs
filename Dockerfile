@@ -39,6 +39,11 @@ COPY --from=builder /app/dist ./dist
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001
 
+# Finance attachments live here; docker-compose mounts a named volume over it,
+# which inherits this ownership the first time it is created.
+RUN mkdir -p /app/storage/finance-attachments && \
+    chown -R nestjs:nodejs /app/storage
+
 USER nestjs
 
 EXPOSE 3000

@@ -7,6 +7,7 @@ import {
 import { RecordService } from './record.service';
 import { ArticleService } from './article.service';
 import { AccountService } from './account.service';
+import { AttachmentService } from './attachment.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   FinanceRecord,
@@ -55,6 +56,13 @@ describe('RecordService', () => {
         {
           provide: AccountService,
           useValue: { assertAccountUsable: jest.fn() },
+        },
+        {
+          provide: AttachmentService,
+          useValue: {
+            storageKeysFor: jest.fn().mockResolvedValue([]),
+            discardFiles: jest.fn(),
+          },
         },
       ],
     }).compile();

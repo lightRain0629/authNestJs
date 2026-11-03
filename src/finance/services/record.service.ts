@@ -8,6 +8,20 @@ import { CreateRecordDto, UpdateRecordDto, ListRecordsDto } from '../dto';
 import { FinanceRecord, FinanceArticleKind, Prisma } from '@prisma/client';
 import { ArticleService } from './article.service';
 import { AccountService } from './account.service';
+import { AttachmentService } from './attachment.service';
+
+/**
+ * What every record read brings along. The attachment count rides on the same
+ * query as a correlated subquery, so a page of records costs one round trip
+ * however many of them have files.
+ */
+export const RECORD_INCLUDE = {
+  article: { select: { id: true, name: true, kind: true, color: true } },
+  account: {
+    select: { id: true, name: true, kind: true, currency: true, color: true },
+  },
+  _count: { select: { attachments: true } },
+} satisfies Prisma.FinanceRecordInclude;
 
 /**
  * Structural so both the records table and the conversions table can be
@@ -36,6 +50,7 @@ type RecordWithArticle = FinanceRecord & {
     currency: string;
     color: string | null;
   } | null;
+  _count?: { attachments: number };
 };
 
 @Injectable()
@@ -44,6 +59,7 @@ export class RecordService {
     private readonly prisma: PrismaService,
     private readonly articleService: ArticleService,
     private readonly accountService: AccountService,
+    private readonly attachmentService: AttachmentService,
   ) {}
 
   async create(
@@ -85,20 +101,7 @@ export class RecordService {
         remark: dto.remark ?? null,
         operationDate: new Date(dto.operationDate),
       },
-      include: {
-        article: {
-          select: { id: true, name: true, kind: true, color: true },
-        },
-        account: {
-          select: {
-            id: true,
-            name: true,
-            kind: true,
-            currency: true,
-            color: true,
-          },
-        },
-      },
+      include: RECORD_INCLUDE,
     });
   }
 
@@ -147,20 +150,7 @@ export class RecordService {
         orderBy,
         skip,
         take: limit,
-        include: {
-          article: {
-            select: { id: true, name: true, kind: true, color: true },
-          },
-          account: {
-            select: {
-              id: true,
-              name: true,
-              kind: true,
-              currency: true,
-              color: true,
-            },
-          },
-        },
+        include: RECORD_INCLUDE,
       }),
       this.prisma.financeRecord.count({ where }),
     ]);
@@ -222,20 +212,7 @@ export class RecordService {
   async findOne(id: string, userId: string): Promise<RecordWithArticle> {
     const record = await this.prisma.financeRecord.findFirst({
       where: { id, userId },
-      include: {
-        article: {
-          select: { id: true, name: true, kind: true, color: true },
-        },
-        account: {
-          select: {
-            id: true,
-            name: true,
-            kind: true,
-            currency: true,
-            color: true,
-          },
-        },
-      },
+      include: RECORD_INCLUDE,
     });
 
     if (!record) {
@@ -330,20 +307,7 @@ export class RecordService {
     return this.prisma.financeRecord.update({
       where: { id },
       data: updateData,
-      include: {
-        article: {
-          select: { id: true, name: true, kind: true, color: true },
-        },
-        account: {
-          select: {
-            id: true,
-            name: true,
-            kind: true,
-            currency: true,
-            color: true,
-          },
-        },
-      },
+      include: RECORD_INCLUDE,
     });
   }
 
@@ -387,11 +351,18 @@ export class RecordService {
     return { baseCurrency: currency, baseRate: decimal };
   }
 
+  /** The cascade drops the attachment rows; their files go after it. */
   async remove(id: string, userId: string): Promise<FinanceRecord> {
     await this.findOne(id, userId);
 
-    return this.prisma.financeRecord.delete({
+    const storageKeys = await this.attachmentService.storageKeysFor({
+      recordId: id,
+    });
+    const record = await this.prisma.financeRecord.delete({
       where: { id },
     });
+    await this.attachmentService.discardFiles(storageKeys);
+
+    return record;
   }
 }

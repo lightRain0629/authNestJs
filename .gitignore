@@ -38,3 +38,5 @@ lerna-debug.log*
 
 # Database backups
 /backups
+# Finance attachments (uploaded files)
+/storage

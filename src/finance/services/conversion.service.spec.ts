@@ -6,6 +6,7 @@ import {
 import { ConversionService } from './conversion.service';
 import { RateService } from './rate.service';
 import { AccountService } from './account.service';
+import { AttachmentService } from './attachment.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrencyConversion, CurrencyRate, Prisma } from '@prisma/client';
 
@@ -51,6 +52,13 @@ describe('ConversionService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: RateService, useValue: rateService },
         { provide: AccountService, useValue: accountService },
+        {
+          provide: AttachmentService,
+          useValue: {
+            storageKeysFor: jest.fn().mockResolvedValue([]),
+            discardFiles: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

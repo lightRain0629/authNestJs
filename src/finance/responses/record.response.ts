@@ -16,6 +16,7 @@ type RecordWithArticle = FinanceRecord & {
     currency: string;
     color: string | null;
   } | null;
+  _count?: { attachments: number };
 };
 
 export class RecordResponse {
@@ -82,6 +83,9 @@ export class RecordResponse {
     color: string | null;
   } | null;
 
+  @ApiProperty({ description: 'Number of files attached to this record' })
+  attachmentCount: number;
+
   constructor(record: RecordWithArticle) {
     this.id = record.id;
     this.userId = record.userId;
@@ -101,5 +105,6 @@ export class RecordResponse {
     this.updatedAt = record.updatedAt;
     this.article = record.article ?? null;
     this.account = record.account ?? null;
+    this.attachmentCount = record._count?.attachments ?? 0;
   }
 }

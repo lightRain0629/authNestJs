@@ -73,6 +73,28 @@ describe('TransactionService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  it('carries attachment counts from the same two queries, no per-row lookups', async () => {
+    prisma.financeRecord.findMany.mockResolvedValue([
+      { ...record('r-2', 2), _count: { attachments: 3 } },
+    ]);
+    prisma.currencyConversion.findMany.mockResolvedValue([
+      { ...transfer('t-1', 1), _count: { attachments: 1 } },
+    ]);
+
+    const { items } = await service.findAll(userId, {});
+
+    expect(items[0].record?.attachmentCount).toBe(3);
+    expect(items[1].transfer?.attachmentCount).toBe(1);
+    expect(prisma.financeRecord.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.currencyConversion.findMany).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.financeRecord.findMany.mock.calls[0][0].include._count,
+    ).toEqual({ select: { attachments: true } });
+    expect(
+      prisma.currencyConversion.findMany.mock.calls[0][0].include._count,
+    ).toEqual({ select: { attachments: true } });
+  });
+
   it('interleaves records and transfers by date, newest first', async () => {
     prisma.financeRecord.findMany.mockResolvedValue([
       record('r-5', 5),

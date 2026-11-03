@@ -7,14 +7,8 @@ import {
   RecordResponse,
   TransactionResponse,
 } from '../responses';
-import { RecordService } from './record.service';
-
-const RECORD_INCLUDE = {
-  article: { select: { id: true, name: true, kind: true, color: true } },
-  account: {
-    select: { id: true, name: true, kind: true, currency: true, color: true },
-  },
-};
+import { RecordService, RECORD_INCLUDE } from './record.service';
+import { CONVERSION_INCLUDE } from './conversion.service';
 
 /**
  * The one timeline: expenses, incomes and transfers in date order.
@@ -61,6 +55,7 @@ export class TransactionService {
             where: transferWhere,
             orderBy: [{ operationDate: order }, { createdAt: 'desc' }],
             take: need,
+            include: CONVERSION_INCLUDE,
           })
         : Promise.resolve([]),
       wantsRecords

@@ -58,7 +58,12 @@ export class ConversionResponse {
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt: Date;
 
-  constructor(conversion: CurrencyConversion) {
+  @ApiProperty({ description: 'Number of files attached to this transfer' })
+  attachmentCount: number;
+
+  constructor(
+    conversion: CurrencyConversion & { _count?: { attachments: number } },
+  ) {
     this.id = conversion.id;
     this.userId = conversion.userId;
     this.fromAmount =
@@ -90,5 +95,6 @@ export class ConversionResponse {
     this.operationDate = conversion.operationDate;
     this.createdAt = conversion.createdAt;
     this.updatedAt = conversion.updatedAt;
+    this.attachmentCount = conversion._count?.attachments ?? 0;
   }
 }

@@ -8,6 +8,13 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    environment:
+      FINANCE_ATTACHMENTS_DIR: /app/storage/finance-attachments
+    volumes:
+      - finance_attachments:/app/storage/finance-attachments
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+
+volumes:
+  finance_attachments:
