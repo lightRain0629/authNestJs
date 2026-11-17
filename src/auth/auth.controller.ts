@@ -61,8 +61,18 @@ const REFRESH_TOKEN = 'refreshtoken';
 const TOKENS_SCHEMA = {
   type: 'object',
   properties: {
-    accessToken: { type: 'string' },
-    refreshToken: { type: 'string' },
+    accessToken: {
+      type: 'string',
+      description:
+        'Already prefixed with "Bearer " — send it as the Authorization header value unchanged',
+      example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    },
+    refreshToken: {
+      type: 'string',
+      description:
+        'Valid for 1 month, single use — every refresh returns a new one',
+      example: '9b2f6c1e-3a4d-4e8f-9c1b-2d7e5f6a8b90',
+    },
   },
 };
 
@@ -101,7 +111,13 @@ export class AuthController {
     description: 'Tokens issued and refresh token stored in cookie',
     schema: TOKENS_SCHEMA,
   })
-  @ApiBadRequestResponse({ description: 'Invalid credentials supplied' })
+  @ApiBadRequestResponse({
+    description: 'Invalid body, or account registered via Google/Yandex',
+  })
+  @ApiUnauthorizedResponse({
+    description:
+      '"Wrong password or username", or "Email is not verified" (verify with the OTP from registration)',
+  })
   async login(
     @Body() dto: LoginDto,
     @Res() res: Response,
