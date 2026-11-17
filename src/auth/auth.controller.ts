@@ -20,6 +20,7 @@ import {
   ResetPasswordDto,
   VerifyEmailDto,
   ResendOtpDto,
+  RefreshTokenDto,
 } from './dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
@@ -57,6 +58,14 @@ import { JwtPayload } from './interfaces';
 
 const REFRESH_TOKEN = 'refreshtoken';
 
+const TOKENS_SCHEMA = {
+  type: 'object',
+  properties: {
+    accessToken: { type: 'string' },
+    refreshToken: { type: 'string' },
+  },
+};
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -90,13 +99,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Authenticate user credentials' })
   @ApiCreatedResponse({
     description: 'Tokens issued and refresh token stored in cookie',
-    schema: {
-      type: 'object',
-      properties: {
-        accessToken: { type: 'string' },
-        refreshToken: { type: 'string' },
-      },
-    },
+    schema: TOKENS_SCHEMA,
   })
   @ApiBadRequestResponse({ description: 'Invalid credentials supplied' })
   async login(
@@ -118,17 +121,13 @@ export class AuthController {
 
   @Get('refresh-tokens')
   @Public()
-  @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+  @ApiOperation({
+    summary: 'Refresh access and refresh tokens (cookie, for browsers)',
+  })
   @ApiCookieAuth('refreshtoken')
   @ApiCreatedResponse({
     description: 'Tokens refreshed successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        accessToken: { type: 'string' },
-        refreshToken: { type: 'string' },
-      },
-    },
+    schema: TOKENS_SCHEMA,
   })
   @ApiUnauthorizedResponse({ description: 'Refresh token missing or invalid' })
   async refreshTokens(
@@ -137,6 +136,73 @@ export class AuthController {
     @UserAgent() agent: string,
     @IpAddress() ip: string,
     @DeviceId() deviceId?: string,
+  ) {
+    await this.refresh(refreshToken, res, agent, ip, deviceId);
+  }
+
+  @Post('refresh-tokens')
+  @Public()
+  @ApiOperation({
+    summary: 'Refresh access and refresh tokens (body, for mobile)',
+    description:
+      'Send the refresh token in the body. Falls back to the refreshtoken cookie. The old refresh token is revoked — store the new one.',
+  })
+  @ApiCreatedResponse({
+    description: 'Tokens refreshed successfully',
+    schema: TOKENS_SCHEMA,
+  })
+  @ApiUnauthorizedResponse({ description: 'Refresh token missing or invalid' })
+  async refreshTokensFromBody(
+    @Body() dto: RefreshTokenDto,
+    @Cookie(REFRESH_TOKEN) cookieToken: string,
+    @Res() res: Response,
+    @UserAgent() agent: string,
+    @IpAddress() ip: string,
+    @DeviceId() deviceId?: string,
+  ) {
+    await this.refresh(
+      dto.refreshToken ?? cookieToken,
+      res,
+      agent,
+      ip,
+      deviceId,
+    );
+  }
+
+  @Get('logout')
+  @Public()
+  @ApiOperation({ summary: 'Invalidate refresh token cookie' })
+  @ApiCookieAuth('refreshtoken')
+  @ApiOkResponse({ description: 'Refresh token removed' })
+  async logout(
+    @Cookie(REFRESH_TOKEN) refreshToken: string,
+    @Res() res: Response,
+  ) {
+    await this.revoke(refreshToken, res);
+  }
+
+  @Post('logout')
+  @Public()
+  @ApiOperation({
+    summary: 'Invalidate refresh token (body, for mobile)',
+    description:
+      'Send the refresh token in the body. Falls back to the refreshtoken cookie.',
+  })
+  @ApiOkResponse({ description: 'Refresh token removed' })
+  async logoutFromBody(
+    @Body() dto: RefreshTokenDto,
+    @Cookie(REFRESH_TOKEN) cookieToken: string,
+    @Res() res: Response,
+  ) {
+    await this.revoke(dto.refreshToken ?? cookieToken, res);
+  }
+
+  private async refresh(
+    refreshToken: string,
+    res: Response,
+    agent: string,
+    ip: string,
+    deviceId?: string,
   ) {
     if (!refreshToken) {
       throw new UnauthorizedException();
@@ -153,15 +219,7 @@ export class AuthController {
     this.setRefreshTokenToCookies(tokens, res);
   }
 
-  @Get('logout')
-  @Public()
-  @ApiOperation({ summary: 'Invalidate refresh token cookie' })
-  @ApiCookieAuth('refreshtoken')
-  @ApiOkResponse({ description: 'Refresh token removed' })
-  async logout(
-    @Cookie(REFRESH_TOKEN) refreshToken: string,
-    @Res() res: Response,
-  ) {
+  private async revoke(refreshToken: string, res: Response) {
     if (!refreshToken) {
       res.sendStatus(HttpStatus.OK);
       return;
